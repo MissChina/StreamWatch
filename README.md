@@ -25,14 +25,15 @@ A powerful browser script for monitoring and detecting streaming media loading o
 - **数据导出** - 支持导出监控数据为 JSON 格式
 
 ### 🔧 技术特性 / Technical Features
-- **双模式** - 提供 Tampermonkey 用户脚本和控制台脚本两种版本
+- **用户脚本** - 提供高品质的 Tampermonkey 用户脚本
+- **自动监控** - 页面加载完成后自动开启流媒体监控
 - **零依赖** - 纯 JavaScript 实现，无需外部依赖
 - **跨站点** - 支持在任何网站上运行
-- **版本控制** - 内置版本控制和更新检查
+- **HLS增强** - 特别优化对HLS(.m3u8)流媒体的监控和错误处理
 
 ## 📦 安装使用 / Installation & Usage
 
-### 方式一：Tampermonkey 用户脚本 / Method 1: Tampermonkey UserScript
+### Tampermonkey 用户脚本 / Tampermonkey UserScript
 
 1. **安装 Tampermonkey**
    - Chrome: [Tampermonkey Extension](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
@@ -46,61 +47,25 @@ A powerful browser script for monitoring and detecting streaming media loading o
 3. **使用方法**
    - 访问任何视频网站
    - 脚本会自动加载监控面板
-   - 点击"启动监控"开始监控
+   - 监控会在页面加载完成后自动启动
+   - 可以手动点击"停止监控"/"启动监控"切换状态
 
-### 方式二：控制台脚本 / Method 2: Console Script
+## 🎮 用户界面功能 / User Interface Features
 
-1. **复制脚本**
-   - 打开 `streamwatch-console.js` 文件
-   - 复制全部内容
+### 监控面板控制 / Monitoring Panel Controls
+- **启动/停止监控** - 手动切换监控状态
+- **最小化面板** - 点击 `_` 按钮最小化监控面板
+- **拖拽移动** - 可以拖拽面板到任意位置
+- **实时统计** - 显示媒体元素、流媒体请求、错误数和运行时间
 
-2. **粘贴执行**
-   - 在浏览器中按 F12 打开开发者工具
-   - 切换到 Console 标签
-   - 粘贴脚本代码并按回车执行
+### 全局控制台命令 / Global Console Commands
 
-3. **开始使用**
-   ```javascript
-   // 查看帮助
-   sw.help()
-   
-   // 开始监控
-   sw.start()
-   
-   // 查看统计
-   sw.stats()
-   ```
-
-## 🎮 控制台命令 / Console Commands
-
-### 基本控制 / Basic Controls
 ```javascript
-sw.start()        // 开始监控 Start monitoring
-sw.stop()         // 停止监控 Stop monitoring  
-sw.toggle()       // 切换监控状态 Toggle monitoring
-sw.status()       // 查看当前状态 Check current status
-```
+// 查看监控报告
+streamWatchReport()
 
-### 信息查看 / Information
-```javascript
-sw.stats()        // 查看统计信息 View statistics
-sw.report()       // 详细报告 Detailed report
-sw.media()        // 媒体元素列表 Media elements list
-sw.requests()     // 网络请求列表 Network requests list
-```
-
-### 实用功能 / Utilities
-```javascript
-sw.clear()        // 清除日志 Clear logs
-sw.export()       // 导出数据 Export data
-sw.help()         // 显示帮助 Show help
-```
-
-### 高级功能 / Advanced
-```javascript
-sw.monitor('video')   // 监控特定元素 Monitor specific elements
-sw.analyze(url)       // 分析URL Analysis URL
-sw.search('hls')      // 搜索日志 Search logs
+// 切换监控状态  
+streamWatchToggle()
 ```
 
 ## 🎯 支持的流媒体格式 / Supported Formats
@@ -140,8 +105,8 @@ sw.search('hls')      // 搜索日志 Search logs
 StreamWatch/
 ├── README.md                    # 项目说明
 ├── LICENSE                      # 自定义许可证
-├── streamwatch-userscript.js    # Tampermonkey 脚本
-└── streamwatch-console.js       # 控制台脚本
+├── streamwatch-userscript.js    # Tampermonkey 用户脚本 (主要脚本)
+└── test.html                    # 测试页面
 ```
 
 ### 自定义扩展 / Custom Extensions
@@ -195,13 +160,21 @@ const data = sw.export() // 导出监控数据
 ### Q: 脚本无法检测到流媒体？
 A: 请确保：
 1. 脚本已正确加载
-2. 监控已启动 (`sw.start()`)
+2. 脚本会自动启动监控
 3. 页面确实包含流媒体内容
+4. 检查浏览器控制台是否有错误信息
 
 ### Q: 如何在特定网站使用？
 A: 
 1. Tampermonkey版本会自动在所有网站运行
-2. 控制台版本需要在目标网站手动执行
+2. 脚本会在页面加载完成后自动开始监控
+3. 可以通过监控面板手动控制开启/关闭
+
+### Q: HLS流无法检测？
+A: 
+1. 确保URL包含.m3u8或相关HLS标识
+2. 检查网络请求是否被正确拦截
+3. 查看错误日志获取详细信息
 
 ### Q: 如何贡献代码？
 A: 
