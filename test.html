@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamWatch 测试页面 / Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border-left: 4px solid #00ff88;
+        }
+        .video-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        video, audio {
+            width: 100%;
+            max-width: 100%;
+            background: #000;
+            border-radius: 5px;
+        }
+        .controls {
+            margin: 10px 0;
+        }
+        button {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #00cc6a;
+        }
+        .info {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .warning {
+            background: #ff6b35;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .code {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            border: 1px solid #555;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 StreamWatch 测试页面</h1>
+        <p>StreamWatch Test Page - 用于测试流媒体监控脚本</p>
+        <p><strong>版本:</strong> 1.0.0-2025 | <strong>作者:</strong> MissChina</p>
+    </div>
+
+    <div class="test-section">
+        <h2>📖 使用说明 / Instructions</h2>
+        <div class="warning">
+            <strong>⚠️ 重要提醒:</strong> 本页面仅用于测试 StreamWatch 脚本功能。请确保已安装 Tampermonkey 扩展或准备好控制台脚本。
+        </div>
+        
+        <h3>方法一：Tampermonkey 用户脚本</h3>
+        <ol>
+            <li>安装 Tampermonkey 浏览器扩展</li>
+            <li>安装 <code>streamwatch-userscript.js</code> 脚本</li>
+            <li>刷新此页面，应该看到右上角的监控面板</li>
+            <li>点击"启动监控"开始测试</li>
+        </ol>
+
+        <h3>方法二：控制台脚本</h3>
+        <ol>
+            <li>按 F12 打开开发者工具</li>
+            <li>切换到 Console 标签</li>
+            <li>复制并粘贴 <code>streamwatch-console.js</code> 的内容</li>
+            <li>执行脚本后输入 <code>sw.start()</code> 开始监控</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>🎥 测试视频 / Test Videos</h2>
+        <div class="video-container">
+            <div>
+                <h3>MP4 视频测试</h3>
+                <video id="video1" controls>
+                    <source src="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4" type="video/mp4">
+                    <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+                    您的浏览器不支持视频播放
+                </video>
+                <div class="controls">
+                    <button onclick="loadVideo1()">加载视频1</button>
+                    <button onclick="playVideo1()">播放</button>
+                    <button onclick="pauseVideo1()">暂停</button>
+                </div>
+            </div>
+
+            <div>
+                <h3>WebM 视频测试</h3>
+                <video id="video2" controls>
+                    <source src="https://sample-videos.com/zip/10/webm/SampleVideo_1280x720_1mb.webm" type="video/webm">
+                    您的浏览器不支持视频播放
+                </video>
+                <div class="controls">
+                    <button onclick="loadVideo2()">加载视频2</button>
+                    <button onclick="changeSource()">切换源</button>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3>🎵 音频测试 / Audio Test</h3>
+            <audio id="audio1" controls>
+                <source src="https://sample-videos.com/zip/10/mp3/SampleAudio_0.4mb.mp3" type="audio/mpeg">
+                <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" type="audio/wav">
+                您的浏览器不支持音频播放
+            </audio>
+            <div class="controls">
+                <button onclick="loadAudio()">加载音频</button>
+                <button onclick="playAudio()">播放音频</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🌐 网络请求测试 / Network Request Test</h2>
+        <div class="controls">
+            <button onclick="testFetch()">测试 Fetch 请求</button>
+            <button onclick="testXHR()">测试 XHR 请求</button>
+            <button onclick="testStreamingUrls()">测试流媒体URL</button>
+            <button onclick="simulateError()">模拟错误</button>
+        </div>
+        
+        <div class="info">
+            <strong>测试项目:</strong>
+            <ul>
+                <li>fetch() 请求拦截</li>
+                <li>XMLHttpRequest 拦截</li>
+                <li>HLS (.m3u8) 检测</li>
+                <li>DASH (.mpd) 检测</li>
+                <li>媒体格式识别</li>
+                <li>错误处理</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 控制台命令测试 / Console Commands Test</h2>
+        <div class="code">
+// 基本命令测试
+sw.help()           // 显示帮助
+sw.start()          // 开始监控
+sw.status()         // 查看状态
+sw.stats()          // 查看统计
+
+// 高级命令测试  
+sw.monitor('video') // 监控视频元素
+sw.search('mp4')    // 搜索MP4
+sw.analyze('test.m3u8') // 分析URL
+sw.export()         // 导出数据
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 测试日志 / Test Log</h2>
+        <div id="testLog" class="info">
+            <strong>测试日志将在这里显示...</strong>
+        </div>
+    </div>
+
+    <script>
+        // 测试日志函数
+        function log(message) {
+            const logElement = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `<br>[${timestamp}] ${message}`;
+            console.log(`[TestPage] ${message}`);
+        }
+
+        // 视频控制函数
+        function loadVideo1() {
+            const video = document.getElementById('video1');
+            video.load();
+            log('🎥 加载视频1');
+        }
+
+        function playVideo1() {
+            const video = document.getElementById('video1');
+            video.play().then(() => {
+                log('▶️ 视频1开始播放');
+            }).catch(err => {
+                log('❌ 播放失败: ' + err.message);
+            });
+        }
+
+        function pauseVideo1() {
+            const video = document.getElementById('video1');
+            video.pause();
+            log('⏸️ 视频1暂停');
+        }
+
+        function loadVideo2() {
+            const video = document.getElementById('video2');
+            video.load();
+            log('🎥 加载视频2');
+        }
+
+        function changeSource() {
+            const video = document.getElementById('video2');
+            const sources = [
+                'https://sample-videos.com/zip/10/webm/SampleVideo_1280x720_1mb.webm',
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.webm'
+            ];
+            const randomSource = sources[Math.floor(Math.random() * sources.length)];
+            video.src = randomSource;
+            log('🔄 切换视频源: ' + randomSource);
+        }
+
+        function loadAudio() {
+            const audio = document.getElementById('audio1');
+            audio.load();
+            log('🎵 加载音频');
+        }
+
+        function playAudio() {
+            const audio = document.getElementById('audio1');
+            audio.play().then(() => {
+                log('🎵 音频开始播放');
+            }).catch(err => {
+                log('❌ 音频播放失败: ' + err.message);
+            });
+        }
+
+        // 网络请求测试
+        function testFetch() {
+            const testUrls = [
+                'https://example.com/video.mp4',
+                'https://example.com/stream.m3u8',
+                'https://example.com/manifest.mpd'
+            ];
+            
+            testUrls.forEach(url => {
+                fetch(url).catch(() => {}); // 忽略错误，只测试拦截
+                log('🌐 Fetch请求: ' + url);
+            });
+        }
+
+        function testXHR() {
+            const testUrls = [
+                'https://example.com/audio.mp3',
+                'https://example.com/live/stream.m3u8',
+                'https://example.com/video/manifest.mpd'
+            ];
+            
+            testUrls.forEach(url => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', url);
+                xhr.send();
+                log('📡 XHR请求: ' + url);
+            });
+        }
+
+        function testStreamingUrls() {
+            const streamingUrls = [
+                'https://example.com/hls/playlist.m3u8',
+                'https://example.com/dash/manifest.mpd',
+                'https://example.com/rtmp/live/stream',
+                'https://example.com/videos/sample.mp4',
+                'https://example.com/audio/track.aac'
+            ];
+            
+            streamingUrls.forEach(url => {
+                // 模拟检测
+                log('🔍 检测流媒体URL: ' + url);
+                
+                // 如果 StreamWatch 已加载，使用其分析功能
+                if (window.sw && window.sw.analyze) {
+                    window.sw.analyze(url);
+                }
+            });
+        }
+
+        function simulateError() {
+            const video = document.getElementById('video1');
+            video.src = 'https://nonexistent.example.com/error.mp4';
+            video.load();
+            log('❌ 模拟视频加载错误');
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('📄 测试页面加载完成');
+            log('🎬 StreamWatch v1.0.0-2025 测试环境就绪');
+            
+            // 检查是否已加载 StreamWatch
+            setTimeout(() => {
+                if (window.streamWatch) {
+                    log('✅ 检测到 Tampermonkey 版本的 StreamWatch');
+                } else if (window.sw) {
+                    log('✅ 检测到控制台版本的 StreamWatch');
+                } else {
+                    log('⚠️ 未检测到 StreamWatch，请确保脚本已正确加载');
+                }
+            }, 1000);
+        });
+
+        // 监听媒体事件用于测试
+        document.addEventListener('loadstart', (e) => {
+            if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
+                log(`📥 ${e.target.tagName} 开始加载: ${e.target.currentSrc || e.target.src}`);
+            }
+        }, true);
+
+        document.addEventListener('error', (e) => {
+            if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
+                log(`❌ ${e.target.tagName} 加载错误`);
+            }
+        }, true);
+
+        document.addEventListener('canplay', (e) => {
+            if (e.target.tagName === 'VIDEO' || e.target.tagName === 'AUDIO') {
+                log(`✅ ${e.target.tagName} 可以播放`);
+            }
+        }, true);
+    </script>
+</body>
+</html>
