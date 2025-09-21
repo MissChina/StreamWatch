@@ -1,0 +1,81 @@
+StreamWatch 自定义开源协议 / Custom Open Source License
+版本: 1.0 (2025)
+
+版权所有 © 2025 MissChina
+GitHub: https://github.com/MissChina/StreamWatch
+
+中文版本:
+
+1. 使用许可
+   本软件允许免费使用、复制、修改和分发，但需遵守以下条款：
+
+2. 禁止商业用途
+   - 严禁将本软件用于任何商业目的
+   - 严禁销售本软件或基于本软件的衍生产品
+   - 严禁在商业项目中集成本软件
+
+3. 禁止盗用
+   - 严禁声称本软件为自己原创
+   - 严禁移除或修改版权信息
+   - 严禁以任何形式盗用本软件代码
+
+4. 二次开发要求
+   如果基于本软件进行个人二次开发，必须：
+   - 保留原始作者信息和版权声明
+   - 保留原始仓库链接
+   - 在显著位置标注基于 StreamWatch 开发
+   - 不得声称为完全原创作品
+
+5. 分发要求
+   重新分发本软件时，必须：
+   - 包含完整的许可证文本
+   - 保留所有版权声明
+   - 不得移除作者信息
+
+6. 免责声明
+   本软件按"现状"提供，不提供任何明示或暗示的保证。作者不承担任何使用本软件造成的损失责任。
+
+7. 协议变更
+   本协议可能会更新，使用者应定期查看最新版本。
+
+---
+
+English Version:
+
+1. Usage License
+   This software is freely available for use, copy, modification, and distribution, subject to the following terms:
+
+2. No Commercial Use
+   - Commercial use of this software is strictly prohibited
+   - Selling this software or derivative products is forbidden
+   - Integration into commercial projects is not allowed
+
+3. No Plagiarism
+   - Claiming this software as your own original work is prohibited
+   - Removing or modifying copyright information is forbidden
+   - Plagiarizing the software code in any form is not allowed
+
+4. Requirements for Modifications
+   If you create personal modifications based on this software, you must:
+   - Retain original author information and copyright notices
+   - Retain the original repository link
+   - Prominently indicate that it is based on StreamWatch
+   - Not claim it as completely original work
+
+5. Distribution Requirements
+   When redistributing this software, you must:
+   - Include the complete license text
+   - Retain all copyright notices
+   - Not remove author information
+
+6. Disclaimer
+   This software is provided "as is" without any express or implied warranties. The author is not liable for any damages caused by using this software.
+
+7. License Updates
+   This license may be updated, and users should regularly check for the latest version.
+
+---
+
+联系方式 / Contact:
+GitHub: https://github.com/MissChina
+Repository: https://github.com/MissChina/StreamWatch
