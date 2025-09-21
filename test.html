@@ -90,23 +90,16 @@
     <div class="test-section">
         <h2>📖 使用说明 / Instructions</h2>
         <div class="warning">
-            <strong>⚠️ 重要提醒:</strong> 本页面仅用于测试 StreamWatch 脚本功能。请确保已安装 Tampermonkey 扩展或准备好控制台脚本。
+            <strong>⚠️ 重要提醒:</strong> 本页面仅用于测试 StreamWatch 脚本功能。请确保已安装 Tampermonkey 扩展。
         </div>
         
-        <h3>方法一：Tampermonkey 用户脚本</h3>
+        <h3>使用方法：Tampermonkey 用户脚本</h3>
         <ol>
             <li>安装 Tampermonkey 浏览器扩展</li>
             <li>安装 <code>streamwatch-userscript.js</code> 脚本</li>
             <li>刷新此页面，应该看到右上角的监控面板</li>
-            <li>点击"启动监控"开始测试</li>
-        </ol>
-
-        <h3>方法二：控制台脚本</h3>
-        <ol>
-            <li>按 F12 打开开发者工具</li>
-            <li>切换到 Console 标签</li>
-            <li>复制并粘贴 <code>streamwatch-console.js</code> 的内容</li>
-            <li>执行脚本后输入 <code>sw.start()</code> 开始监控</li>
+            <li>脚本会在页面加载完成后自动开始监控</li>
+            <li>可以通过面板按钮手动控制监控状态</li>
         </ol>
     </div>
 
@@ -177,19 +170,15 @@
     </div>
 
     <div class="test-section">
-        <h2>📊 控制台命令测试 / Console Commands Test</h2>
+        <h2>📊 全局控制台命令测试 / Global Console Commands Test</h2>
         <div class="code">
-// 基本命令测试
-sw.help()           // 显示帮助
-sw.start()          // 开始监控
-sw.status()         // 查看状态
-sw.stats()          // 查看统计
+// 全局命令测试
+streamWatchReport()        // 查看监控报告
+streamWatchToggle()        // 切换监控状态
 
-// 高级命令测试  
-sw.monitor('video') // 监控视频元素
-sw.search('mp4')    // 搜索MP4
-sw.analyze('test.m3u8') // 分析URL
-sw.export()         // 导出数据
+// 访问 window.streamWatch 对象进行高级操作
+window.streamWatch.getReport()     // 获取详细报告
+window.streamWatch.toggle()        // 切换监控状态
         </div>
     </div>
 
@@ -327,13 +316,16 @@ sw.export()         // 导出数据
             // 检查是否已加载 StreamWatch
             setTimeout(() => {
                 if (window.streamWatch) {
-                    log('✅ 检测到 Tampermonkey 版本的 StreamWatch');
-                } else if (window.sw) {
-                    log('✅ 检测到控制台版本的 StreamWatch');
+                    log('✅ 检测到 StreamWatch 用户脚本');
+                    if (window.streamWatch.isActive) {
+                        log('🎯 监控已自动启动');
+                    } else {
+                        log('⏸️ 监控暂未启动，等待自动启动或手动控制');
+                    }
                 } else {
-                    log('⚠️ 未检测到 StreamWatch，请确保脚本已正确加载');
+                    log('⚠️ 未检测到 StreamWatch，请确保已安装Tampermonkey脚本');
                 }
-            }, 1000);
+            }, 2000);
         });
 
         // 监听媒体事件用于测试

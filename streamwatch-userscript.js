@@ -57,13 +57,23 @@
                 startTime: Date.now()
             };
             
-            // 支持的流媒体格式
+            // 支持的流媒体格式 - 增强HLS和流媒体检测
             this.streamFormats = {
-                hls: ['.m3u8'],
-                dash: ['.mpd'],
-                video: ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'],
-                audio: ['.mp3', '.aac', '.ogg', '.wav', '.flac'],
-                live: ['live', 'stream', 'rtmp', 'rtsp']
+                hls: ['.m3u8', '/playlist.m3u8', '/index.m3u8', 'master.m3u8', 'playlist', '/live/'],
+                dash: ['.mpd', '/manifest.mpd', '/dash/'],
+                video: ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.ts'],
+                audio: ['.mp3', '.aac', '.ogg', '.wav', '.flac', '.m4a'],
+                live: ['live', 'stream', 'rtmp', 'rtsp', 'websocket', 'wss://', '/live/', '/stream/'],
+                adaptive: ['m3u8', 'mpd', 'playlist', 'manifest', 'segment', 'chunk']
+            };
+            
+            // HLS特定的错误类型
+            this.hlsErrors = {
+                NETWORK_ERROR: 'HLS网络错误',
+                MEDIA_ERROR: 'HLS媒体错误', 
+                KEY_SYSTEM_ERROR: 'HLS密钥系统错误',
+                MUX_ERROR: 'HLS复用错误',
+                OTHER_ERROR: 'HLS其他错误'
             };
             
             this.init();
@@ -75,6 +85,26 @@
             this.monitorExistingMedia();
             this.interceptNetworkRequests();
             this.startPeriodicCheck();
+            
+            // 当页面加载完成时自动开启监控
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.autoStartMonitoring();
+                });
+            } else {
+                // 页面已经加载完成
+                this.autoStartMonitoring();
+            }
+        }
+        
+        // 自动开启监控
+        autoStartMonitoring() {
+            setTimeout(() => {
+                if (!this.isActive) {
+                    this.toggle();
+                    this.log('🎯 页面加载完成，自动开启流媒体监控');
+                }
+            }, 1000); // 延迟1秒确保页面完全加载
         }
         
         // 创建监控界面
@@ -84,47 +114,87 @@
             panel.innerHTML = `
                 <div style="
                     position: fixed;
-                    top: 10px;
-                    right: 10px;
+                    top: 20px;
+                    right: 20px;
                     z-index: 999999;
-                    background: rgba(0, 0, 0, 0.9);
+                    background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
                     color: #00ff88;
-                    padding: 15px;
-                    border-radius: 8px;
-                    font-family: 'Courier New', monospace;
-                    font-size: 12px;
+                    padding: 20px;
+                    border-radius: 12px;
+                    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+                    font-size: 13px;
                     border: 2px solid #00ff88;
-                    min-width: 280px;
-                    max-height: 400px;
+                    min-width: 320px;
+                    max-height: 500px;
                     overflow-y: auto;
-                    backdrop-filter: blur(5px);
+                    backdrop-filter: blur(10px);
+                    box-shadow: 0 8px 32px rgba(0, 255, 136, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+                    transition: all 0.3s ease;
                 ">
-                    <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
-                        <strong>🎬 StreamWatch v${STREAMWATCH_VERSION}</strong>
-                        <button id="streamwatch-toggle" style="
-                            background: #00ff88;
-                            color: black;
-                            border: none;
-                            padding: 5px 10px;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            margin-left: 10px;
-                        ">启动监控</button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(0, 255, 136, 0.3); padding-bottom: 10px;">
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-size: 18px; margin-right: 8px;">🎬</span>
+                            <strong style="color: #ffffff; font-size: 14px;">StreamWatch v${STREAMWATCH_VERSION}</strong>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="streamwatch-minimize" style="
+                                background: rgba(255, 193, 7, 0.8);
+                                color: #000;
+                                border: none;
+                                padding: 4px 8px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 11px;
+                                font-weight: bold;
+                                transition: all 0.2s ease;
+                            ">_</button>
+                            <button id="streamwatch-toggle" style="
+                                background: linear-gradient(135deg, #00ff88, #00cc6a);
+                                color: #000;
+                                border: none;
+                                padding: 6px 12px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 11px;
+                                font-weight: bold;
+                                transition: all 0.2s ease;
+                                box-shadow: 0 2px 8px rgba(0, 255, 136, 0.3);
+                            ">启动监控</button>
+                        </div>
                     </div>
-                    <div id="streamwatch-stats">
-                        <div>📊 媒体元素: <span id="media-count">0</span></div>
-                        <div>🌐 流媒体请求: <span id="stream-count">0</span></div>
-                        <div>❌ 错误数: <span id="error-count">0</span></div>
-                        <div>⏱️ 运行时间: <span id="runtime">0s</span></div>
+                    <div id="streamwatch-content">
+                        <div id="streamwatch-stats" style="margin-bottom: 15px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                                <div style="background: rgba(0, 255, 136, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
+                                    <div style="color: #00ff88; font-weight: bold; font-size: 16px;" id="media-count">0</div>
+                                    <div style="color: #ccc; font-size: 10px;">媒体元素</div>
+                                </div>
+                                <div style="background: rgba(54, 162, 235, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
+                                    <div style="color: #36a2eb; font-weight: bold; font-size: 16px;" id="stream-count">0</div>
+                                    <div style="color: #ccc; font-size: 10px;">流媒体请求</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div style="background: rgba(255, 99, 132, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
+                                    <div style="color: #ff6384; font-weight: bold; font-size: 16px;" id="error-count">0</div>
+                                    <div style="color: #ccc; font-size: 10px;">错误数</div>
+                                </div>
+                                <div style="background: rgba(255, 206, 86, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
+                                    <div style="color: #ffce56; font-weight: bold; font-size: 16px;" id="runtime">0s</div>
+                                    <div style="color: #ccc; font-size: 10px;">运行时间</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="streamwatch-log" style="
+                            margin-top: 10px;
+                            max-height: 200px;
+                            overflow-y: auto;
+                            border-top: 1px solid rgba(0, 255, 136, 0.3);
+                            padding-top: 10px;
+                            font-size: 11px;
+                            color: #ccc;
+                        "></div>
                     </div>
-                    <div id="streamwatch-log" style="
-                        margin-top: 10px;
-                        max-height: 200px;
-                        overflow-y: auto;
-                        border-top: 1px solid #00ff88;
-                        padding-top: 8px;
-                        font-size: 11px;
-                    "></div>
                 </div>
             `;
             
@@ -132,7 +202,19 @@
             
             // 添加事件监听
             const toggleBtn = document.getElementById('streamwatch-toggle');
+            const minimizeBtn = document.getElementById('streamwatch-minimize');
+            const content = document.getElementById('streamwatch-content');
+            
             toggleBtn.addEventListener('click', () => this.toggle());
+            
+            // 最小化功能
+            let isMinimized = false;
+            minimizeBtn.addEventListener('click', () => {
+                isMinimized = !isMinimized;
+                content.style.display = isMinimized ? 'none' : 'block';
+                minimizeBtn.textContent = isMinimized ? '□' : '_';
+                minimizeBtn.style.background = isMinimized ? 'rgba(76, 175, 80, 0.8)' : 'rgba(255, 193, 7, 0.8)';
+            });
             
             // 使面板可拖拽
             this.makeDraggable(panel.firstElementChild);
@@ -175,7 +257,12 @@
             this.isActive = !this.isActive;
             const toggleBtn = document.getElementById('streamwatch-toggle');
             toggleBtn.textContent = this.isActive ? '停止监控' : '启动监控';
-            toggleBtn.style.background = this.isActive ? '#ff4444' : '#00ff88';
+            toggleBtn.style.background = this.isActive ? 
+                'linear-gradient(135deg, #ff4444, #cc3333)' : 
+                'linear-gradient(135deg, #00ff88, #00cc6a)';
+            toggleBtn.style.boxShadow = this.isActive ? 
+                '0 2px 8px rgba(255, 68, 68, 0.3)' : 
+                '0 2px 8px rgba(0, 255, 136, 0.3)';
             
             if (this.isActive) {
                 this.log('🚀 开始监控流媒体加载...');
@@ -205,8 +292,10 @@
                 subtree: true
             });
             
-            // 监控媒体事件
-            ['loadstart', 'loadeddata', 'canplay', 'playing', 'error', 'stalled'].forEach(event => {
+            // 监控媒体事件 - 增加更多事件类型用于全面监控
+            ['loadstart', 'loadeddata', 'loadedmetadata', 'canplay', 'canplaythrough', 
+             'playing', 'pause', 'ended', 'error', 'stalled', 'waiting', 'seeking', 
+             'seeked', 'ratechange', 'volumechange', 'abort', 'emptied', 'suspend'].forEach(event => {
                 document.addEventListener(event, (e) => {
                     if (!this.isActive) return;
                     this.handleMediaEvent(e);
@@ -252,22 +341,91 @@
             this.log(`📺 发现${element.tagName.toLowerCase()}元素: ${src || '无源地址'}`);
         }
         
-        // 处理媒体事件
+        // 处理媒体事件 - 增强错误处理和HLS监控
         handleMediaEvent(event) {
             const element = event.target;
             const eventType = event.type;
+            const currentSrc = element.currentSrc || element.src;
             
-            if (eventType === 'error') {
-                this.stats.errors++;
-                this.log(`❌ 媒体错误: ${element.tagName} - ${element.error?.message || '未知错误'}`);
-            } else if (eventType === 'playing') {
-                this.log(`▶️ 开始播放: ${element.tagName} - ${element.currentSrc}`);
-            } else if (eventType === 'loadeddata') {
-                this.log(`📥 数据加载完成: ${element.tagName}`);
-                this.analyzeMediaUrl(element.currentSrc, element.tagName.toLowerCase());
+            try {
+                if (eventType === 'error') {
+                    this.stats.errors++;
+                    let errorMessage = '未知错误';
+                    let errorCode = '';
+                    
+                    if (element.error) {
+                        errorCode = element.error.code;
+                        switch (element.error.code) {
+                            case 1:
+                                errorMessage = 'MEDIA_ERR_ABORTED - 媒体加载被中止';
+                                break;
+                            case 2:
+                                errorMessage = 'MEDIA_ERR_NETWORK - 网络错误';
+                                break;
+                            case 3:
+                                errorMessage = 'MEDIA_ERR_DECODE - 解码错误';
+                                break;
+                            case 4:
+                                errorMessage = 'MEDIA_ERR_SRC_NOT_SUPPORTED - 不支持的媒体格式';
+                                break;
+                            default:
+                                errorMessage = element.error.message || '未知错误';
+                        }
+                    }
+                    
+                    // 特殊处理HLS错误
+                    if (currentSrc && this.isHLSUrl(currentSrc)) {
+                        this.handleHLSError(element, errorCode, errorMessage);
+                    } else {
+                        this.log(`❌ 媒体错误: ${element.tagName} (${errorCode}) - ${errorMessage}`);
+                        this.log(`📍 错误源: ${currentSrc}`);
+                    }
+                    
+                } else if (eventType === 'playing') {
+                    this.log(`▶️ 开始播放: ${element.tagName} - ${currentSrc}`);
+                    if (this.isHLSUrl(currentSrc)) {
+                        this.log(`🎯 检测到HLS流播放: ${currentSrc}`);
+                    }
+                } else if (eventType === 'loadeddata') {
+                    this.log(`📥 数据加载完成: ${element.tagName}`);
+                    this.analyzeMediaUrl(currentSrc, element.tagName.toLowerCase());
+                } else if (eventType === 'stalled') {
+                    this.log(`⏸️ 播放停滞: ${element.tagName} - 可能的网络问题`);
+                } else if (eventType === 'loadstart') {
+                    this.log(`🔄 开始加载: ${element.tagName} - ${currentSrc}`);
+                }
+                
+            } catch (error) {
+                console.error('StreamWatch处理媒体事件时出错:', error);
+                this.log(`⚠️ 事件处理异常: ${error.message}`);
             }
             
             this.updateStats();
+        }
+        
+        // 检查是否为HLS URL
+        isHLSUrl(url) {
+            if (!url) return false;
+            const urlLower = url.toLowerCase();
+            return this.streamFormats.hls.some(pattern => urlLower.includes(pattern));
+        }
+        
+        // 处理HLS特定错误
+        handleHLSError(element, errorCode, errorMessage) {
+            this.log(`🚨 HLS流错误: ${element.tagName} (${errorCode}) - ${errorMessage}`);
+            this.log(`📍 HLS源: ${element.currentSrc || element.src}`);
+            
+            // 尝试获取更多HLS错误信息
+            if (element.error && element.error.data) {
+                this.log(`🔍 HLS错误详情: ${JSON.stringify(element.error.data)}`);
+            }
+            
+            // 建议解决方案
+            if (errorCode === 2) {
+                this.log(`💡 建议: 检查网络连接和HLS服务器状态`);
+            } else if (errorCode === 4) {
+                this.log(`💡 建议: 浏览器可能不支持此HLS格式，尝试使用hls.js库`);
+            }
         }
         
         // 拦截网络请求
@@ -363,7 +521,7 @@
             return 'unknown';
         }
         
-        // 记录日志
+        // 记录日志 - 增强UI展示
         log(message) {
             const timestamp = new Date().toLocaleTimeString();
             const logEntry = `[${timestamp}] ${message}`;
@@ -374,15 +532,29 @@
             const logContainer = document.getElementById('streamwatch-log');
             if (logContainer) {
                 const logElement = document.createElement('div');
-                logElement.textContent = logEntry;
-                logElement.style.marginBottom = '2px';
+                logElement.innerHTML = `<span style="color: #666; font-size: 10px;">[${timestamp}]</span> <span style="color: #ccc;">${message}</span>`;
+                logElement.style.marginBottom = '4px';
+                logElement.style.lineHeight = '1.3';
+                logElement.style.fontSize = '11px';
+                
+                // 根据消息类型设置颜色
+                if (message.includes('❌') || message.includes('🚨')) {
+                    logElement.style.color = '#ff6384';
+                } else if (message.includes('🎯') || message.includes('▶️')) {
+                    logElement.style.color = '#00ff88';
+                } else if (message.includes('⚠️') || message.includes('⏸️')) {
+                    logElement.style.color = '#ffce56';
+                } else if (message.includes('🌐') || message.includes('📥')) {
+                    logElement.style.color = '#36a2eb';
+                }
+                
                 logContainer.appendChild(logElement);
                 
-                // 保持最新日志在顶部
+                // 保持最新日志在底部可见
                 logContainer.scrollTop = logContainer.scrollHeight;
                 
-                // 限制日志条数
-                while (logContainer.children.length > 50) {
+                // 限制日志条数防止内存占用过多
+                while (logContainer.children.length > 100) {
                     logContainer.removeChild(logContainer.firstChild);
                 }
             }
