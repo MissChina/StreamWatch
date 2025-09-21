@@ -80,21 +80,36 @@
         }
         
         init() {
-            this.createUI();
-            this.setupEventListeners();
-            this.monitorExistingMedia();
-            this.interceptNetworkRequests();
-            this.startPeriodicCheck();
-            
-            // 当页面加载完成时自动开启监控
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', () => {
+            try {
+                this.createUI();
+                this.setupEventListeners();
+                this.monitorExistingMedia();
+                this.interceptNetworkRequests();
+                this.startPeriodicCheck();
+                
+                // 当页面加载完成时自动开启监控
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        this.autoStartMonitoring();
+                    });
+                } else {
+                    // 页面已经加载完成
                     this.autoStartMonitoring();
-                });
-            } else {
-                // 页面已经加载完成
-                this.autoStartMonitoring();
+                }
+            } catch (error) {
+                console.error('StreamWatch初始化失败:', error);
+                // 降级处理 - 至少尝试创建基本UI
+                try {
+                    this.createBasicUI();
+                } catch (fallbackError) {
+                    console.error('StreamWatch降级初始化也失败:', fallbackError);
+                }
             }
+        }
+        
+        // 基本UI创建（降级版本）
+        createBasicUI() {
+            console.log('%c🎬 StreamWatch 以降级模式运行', 'color: #ffce56;');
         }
         
         // 自动开启监控
