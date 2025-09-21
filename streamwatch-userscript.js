@@ -116,35 +116,36 @@
                     position: fixed;
                     top: 20px;
                     right: 20px;
-                    z-index: 999999;
+                    z-index: 9999;
                     background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
                     color: #00ff88;
-                    padding: 20px;
-                    border-radius: 12px;
+                    padding: 12px;
+                    border-radius: 8px;
                     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-                    font-size: 13px;
-                    border: 2px solid #00ff88;
-                    min-width: 320px;
-                    max-height: 500px;
+                    font-size: 12px;
+                    border: 1px solid #00ff88;
+                    width: 240px;
+                    max-height: 400px;
                     overflow-y: auto;
                     backdrop-filter: blur(10px);
-                    box-shadow: 0 8px 32px rgba(0, 255, 136, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
+                    box-shadow: 0 4px 16px rgba(0, 255, 136, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
                     transition: all 0.3s ease;
+                    cursor: move;
                 ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(0, 255, 136, 0.3); padding-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(0, 255, 136, 0.3); padding-bottom: 8px;">
                         <div style="display: flex; align-items: center;">
-                            <span style="font-size: 18px; margin-right: 8px;">🎬</span>
-                            <strong style="color: #ffffff; font-size: 14px;">StreamWatch v${STREAMWATCH_VERSION}</strong>
+                            <span style="font-size: 14px; margin-right: 6px;">🎬</span>
+                            <strong style="color: #ffffff; font-size: 11px;">StreamWatch</strong>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 4px;">
                             <button id="streamwatch-minimize" style="
                                 background: rgba(255, 193, 7, 0.8);
                                 color: #000;
                                 border: none;
-                                padding: 4px 8px;
-                                border-radius: 6px;
+                                padding: 2px 6px;
+                                border-radius: 4px;
                                 cursor: pointer;
-                                font-size: 11px;
+                                font-size: 10px;
                                 font-weight: bold;
                                 transition: all 0.2s ease;
                             ">_</button>
@@ -152,46 +153,46 @@
                                 background: linear-gradient(135deg, #00ff88, #00cc6a);
                                 color: #000;
                                 border: none;
-                                padding: 6px 12px;
-                                border-radius: 6px;
+                                padding: 4px 8px;
+                                border-radius: 4px;
                                 cursor: pointer;
-                                font-size: 11px;
+                                font-size: 10px;
                                 font-weight: bold;
                                 transition: all 0.2s ease;
-                                box-shadow: 0 2px 8px rgba(0, 255, 136, 0.3);
+                                box-shadow: 0 1px 4px rgba(0, 255, 136, 0.3);
                             ">启动监控</button>
                         </div>
                     </div>
                     <div id="streamwatch-content">
-                        <div id="streamwatch-stats" style="margin-bottom: 15px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                                <div style="background: rgba(0, 255, 136, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
-                                    <div style="color: #00ff88; font-weight: bold; font-size: 16px;" id="media-count">0</div>
-                                    <div style="color: #ccc; font-size: 10px;">媒体元素</div>
+                        <div id="streamwatch-stats" style="margin-bottom: 10px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
+                                <div style="background: rgba(0, 255, 136, 0.1); padding: 6px; border-radius: 4px; text-align: center;">
+                                    <div style="color: #00ff88; font-weight: bold; font-size: 14px;" id="media-count">0</div>
+                                    <div style="color: #ccc; font-size: 9px;">媒体元素</div>
                                 </div>
-                                <div style="background: rgba(54, 162, 235, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
-                                    <div style="color: #36a2eb; font-weight: bold; font-size: 16px;" id="stream-count">0</div>
-                                    <div style="color: #ccc; font-size: 10px;">流媒体请求</div>
+                                <div style="background: rgba(54, 162, 235, 0.1); padding: 6px; border-radius: 4px; text-align: center;">
+                                    <div style="color: #36a2eb; font-weight: bold; font-size: 14px;" id="stream-count">0</div>
+                                    <div style="color: #ccc; font-size: 9px;">流媒体请求</div>
                                 </div>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                                <div style="background: rgba(255, 99, 132, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
-                                    <div style="color: #ff6384; font-weight: bold; font-size: 16px;" id="error-count">0</div>
-                                    <div style="color: #ccc; font-size: 10px;">错误数</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                <div style="background: rgba(255, 99, 132, 0.1); padding: 6px; border-radius: 4px; text-align: center;">
+                                    <div style="color: #ff6384; font-weight: bold; font-size: 14px;" id="error-count">0</div>
+                                    <div style="color: #ccc; font-size: 9px;">错误数</div>
                                 </div>
-                                <div style="background: rgba(255, 206, 86, 0.1); padding: 8px; border-radius: 6px; text-align: center;">
-                                    <div style="color: #ffce56; font-weight: bold; font-size: 16px;" id="runtime">0s</div>
-                                    <div style="color: #ccc; font-size: 10px;">运行时间</div>
+                                <div style="background: rgba(255, 206, 86, 0.1); padding: 6px; border-radius: 4px; text-align: center;">
+                                    <div style="color: #ffce56; font-weight: bold; font-size: 14px;" id="runtime">0s</div>
+                                    <div style="color: #ccc; font-size: 9px;">运行时间</div>
                                 </div>
                             </div>
                         </div>
                         <div id="streamwatch-log" style="
-                            margin-top: 10px;
-                            max-height: 200px;
+                            margin-top: 8px;
+                            max-height: 120px;
                             overflow-y: auto;
                             border-top: 1px solid rgba(0, 255, 136, 0.3);
-                            padding-top: 10px;
-                            font-size: 11px;
+                            padding-top: 8px;
+                            font-size: 10px;
                             color: #ccc;
                         "></div>
                     </div>
@@ -223,32 +224,56 @@
         // 使界面可拖拽
         makeDraggable(element) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            let isDragging = false;
             element.onmousedown = dragMouseDown;
             
             function dragMouseDown(e) {
                 e = e || window.event;
                 e.preventDefault();
+                
+                // 只在header区域启用拖拽
+                if (e.target.tagName === 'BUTTON') return;
+                
+                isDragging = true;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
                 document.onmouseup = closeDragElement;
                 document.onmousemove = elementDrag;
+                element.style.cursor = 'grabbing';
             }
             
             function elementDrag(e) {
+                if (!isDragging) return;
+                
                 e = e || window.event;
                 e.preventDefault();
                 pos1 = pos3 - e.clientX;
                 pos2 = pos4 - e.clientY;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
-                element.style.top = (element.offsetTop - pos2) + "px";
-                element.style.left = (element.offsetLeft - pos1) + "px";
+                
+                // 计算新位置并确保在视窗内
+                let newTop = element.offsetTop - pos2;
+                let newLeft = element.offsetLeft - pos1;
+                
+                // 边界检查
+                const rect = element.getBoundingClientRect();
+                const maxTop = window.innerHeight - rect.height;
+                const maxLeft = window.innerWidth - rect.width;
+                
+                newTop = Math.max(0, Math.min(newTop, maxTop));
+                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                
+                element.style.top = newTop + "px";
+                element.style.left = newLeft + "px";
                 element.style.right = 'auto';
             }
             
             function closeDragElement() {
+                isDragging = false;
                 document.onmouseup = null;
                 document.onmousemove = null;
+                element.style.cursor = 'move';
             }
         }
         
