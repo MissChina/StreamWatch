@@ -50,6 +50,7 @@
             this.isActive = false;
             this.mediaElements = new Set();
             this.networkRequests = new Map();
+            this.videoEntries = new Map(); // 新增：视频条目管理
             this.stats = {
                 mediaElementsFound: 0,
                 streamRequests: 0,
@@ -64,7 +65,8 @@
                 video: ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.flv', '.ts'],
                 audio: ['.mp3', '.aac', '.ogg', '.wav', '.flac', '.m4a'],
                 live: ['live', 'stream', 'rtmp', 'rtsp', 'websocket', 'wss://', '/live/', '/stream/'],
-                adaptive: ['m3u8', 'mpd', 'playlist', 'manifest', 'segment', 'chunk']
+                adaptive: ['m3u8', 'mpd', 'playlist', 'manifest', 'segment', 'chunk'],
+                blob: ['blob:', 'data:'] // 新增：Blob类型检测
             };
             
             // HLS特定的错误类型
@@ -109,6 +111,20 @@
         
         // 创建监控界面
         createUI() {
+            // 添加CSS动画
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                
+                #streamwatch-toast {
+                    animation: slideIn 0.3s ease-out !important;
+                }
+            `;
+            document.head.appendChild(style);
+            
             const panel = document.createElement('div');
             panel.id = 'streamwatch-panel';
             panel.innerHTML = `
@@ -124,8 +140,8 @@
                     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
                     font-size: 12px;
                     border: 1px solid #00ff88;
-                    width: 240px;
-                    max-height: 400px;
+                    width: 320px;
+                    max-height: 600px;
                     overflow-y: auto;
                     backdrop-filter: blur(10px);
                     box-shadow: 0 4px 16px rgba(0, 255, 136, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1);
@@ -135,7 +151,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(0, 255, 136, 0.3); padding-bottom: 8px;">
                         <div style="display: flex; align-items: center;">
                             <span style="font-size: 14px; margin-right: 6px;">🎬</span>
-                            <strong style="color: #ffffff; font-size: 11px;">StreamWatch</strong>
+                            <strong style="color: #ffffff; font-size: 11px;">流媒体监控</strong>
                         </div>
                         <div style="display: flex; gap: 4px;">
                             <button id="streamwatch-minimize" style="
@@ -160,7 +176,7 @@
                                 font-weight: bold;
                                 transition: all 0.2s ease;
                                 box-shadow: 0 1px 4px rgba(0, 255, 136, 0.3);
-                            ">启动监控</button>
+                            ">开始监控</button>
                         </div>
                     </div>
                     <div id="streamwatch-content">
@@ -168,7 +184,7 @@
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px;">
                                 <div style="background: rgba(0, 255, 136, 0.1); padding: 6px; border-radius: 4px; text-align: center;">
                                     <div style="color: #00ff88; font-weight: bold; font-size: 14px;" id="media-count">0</div>
-                                    <div style="color: #ccc; font-size: 9px;">媒体元素</div>
+                                    <div style="color: #ccc; font-size: 9px;">视频元素</div>
                                 </div>
                                 <div style="background: rgba(54, 162, 235, 0.1); padding: 6px; border-radius: 4px; text-align: center;">
                                     <div style="color: #36a2eb; font-weight: bold; font-size: 14px;" id="stream-count">0</div>
@@ -186,6 +202,24 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- 新增：视频列表区域 -->
+                        <div id="streamwatch-videos" style="margin-top: 10px; border-top: 1px solid rgba(0, 255, 136, 0.3); padding-top: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <h4 style="color: #00ff88; margin: 0; font-size: 12px;">🎥 检测到的视频</h4>
+                                <button id="clear-videos" style="
+                                    background: rgba(255, 99, 132, 0.8);
+                                    color: #fff;
+                                    border: none;
+                                    padding: 2px 6px;
+                                    border-radius: 3px;
+                                    cursor: pointer;
+                                    font-size: 9px;
+                                ">清空</button>
+                            </div>
+                            <div id="video-list" style="max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+                        
                         <div id="streamwatch-log" style="
                             margin-top: 8px;
                             max-height: 120px;
@@ -204,9 +238,11 @@
             // 添加事件监听
             const toggleBtn = document.getElementById('streamwatch-toggle');
             const minimizeBtn = document.getElementById('streamwatch-minimize');
+            const clearBtn = document.getElementById('clear-videos');
             const content = document.getElementById('streamwatch-content');
             
             toggleBtn.addEventListener('click', () => this.toggle());
+            clearBtn.addEventListener('click', () => this.clearVideoList());
             
             // 最小化功能
             let isMinimized = false;
@@ -281,7 +317,7 @@
         toggle() {
             this.isActive = !this.isActive;
             const toggleBtn = document.getElementById('streamwatch-toggle');
-            toggleBtn.textContent = this.isActive ? '停止监控' : '启动监控';
+            toggleBtn.textContent = this.isActive ? '停止监控' : '开始监控';
             toggleBtn.style.background = this.isActive ? 
                 'linear-gradient(135deg, #ff4444, #cc3333)' : 
                 'linear-gradient(135deg, #00ff88, #00cc6a)';
@@ -361,6 +397,11 @@
             const src = element.src || element.currentSrc || '';
             if (src) {
                 this.analyzeMediaUrl(src, element.tagName.toLowerCase());
+                
+                // 如果是视频元素，添加到视频列表
+                if (element.tagName.toLowerCase() === 'video' && src) {
+                    this.addVideoEntry(src, element);
+                }
             }
             
             this.log(`📺 发现${element.tagName.toLowerCase()}元素: ${src || '无源地址'}`);
@@ -488,6 +529,12 @@
                 this.stats.streamRequests++;
                 this.log(`🌐 检测到流媒体请求: ${url}`);
                 this.analyzeMediaUrl(url, 'network');
+                
+                // 如果是视频格式，也添加到视频列表
+                const format = this.detectFormat(url);
+                if (['hls', 'dash', 'video', 'blob'].includes(format)) {
+                    this.addVideoEntry(url, null);
+                }
             }
         }
         
@@ -544,6 +591,311 @@
             }
             
             return 'unknown';
+        }
+        
+        // 新增：添加视频条目
+        addVideoEntry(url, element) {
+            if (this.videoEntries.has(url)) return;
+            
+            const format = this.detectFormat(url);
+            const entry = {
+                url: url,
+                format: format,
+                element: element,
+                timestamp: new Date().toLocaleTimeString(),
+                title: this.getVideoTitle(element) || '未知视频'
+            };
+            
+            this.videoEntries.set(url, entry);
+            this.renderVideoEntry(entry);
+        }
+        
+        // 新增：获取视频标题
+        getVideoTitle(element) {
+            // 尝试从多个来源获取标题
+            const title = element.title || 
+                         element.getAttribute('alt') ||
+                         element.getAttribute('aria-label') ||
+                         document.title ||
+                         '';
+            return title.substring(0, 30); // 限制长度
+        }
+        
+        // 新增：渲染视频条目
+        renderVideoEntry(entry) {
+            const videoList = document.getElementById('video-list');
+            if (!videoList) return;
+            
+            const entryDiv = document.createElement('div');
+            entryDiv.style.cssText = `
+                background: rgba(255, 255, 255, 0.05);
+                margin: 6px 0;
+                padding: 8px;
+                border-radius: 4px;
+                border-left: 3px solid ${this.getFormatColor(entry.format)};
+            `;
+            
+            entryDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="color: #fff; font-weight: bold; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${entry.title}
+                        </div>
+                        <div style="color: #ccc; font-size: 9px; margin-top: 2px;">
+                            ${entry.format.toUpperCase()} • ${entry.timestamp}
+                        </div>
+                    </div>
+                    <span style="background: ${this.getFormatColor(entry.format)}; color: #000; padding: 1px 4px; border-radius: 2px; font-size: 8px; font-weight: bold; margin-left: 6px;">
+                        ${entry.format.toUpperCase()}
+                    </span>
+                </div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                    <button onclick="streamWatch.copyVideoUrl('${entry.url}')" style="
+                        background: #17a2b8; color: #fff; border: none; padding: 3px 6px; border-radius: 3px; 
+                        cursor: pointer; font-size: 8px; font-weight: bold; flex: 1; min-width: 60px;
+                    ">📋 复制链接</button>
+                    <button onclick="streamWatch.openVideoInNewTab('${entry.url}')" style="
+                        background: #28a745; color: #fff; border: none; padding: 3px 6px; border-radius: 3px; 
+                        cursor: pointer; font-size: 8px; font-weight: bold; flex: 1; min-width: 60px;
+                    ">🔗 新窗口</button>
+                    <button onclick="streamWatch.downloadVideo('${entry.url}', '${entry.format}')" style="
+                        background: #007bff; color: #fff; border: none; padding: 3px 6px; border-radius: 3px; 
+                        cursor: pointer; font-size: 8px; font-weight: bold; flex: 1; min-width: 60px;
+                    ">💾 下载</button>
+                    <button onclick="streamWatch.previewVideo('${entry.url}')" style="
+                        background: #6f42c1; color: #fff; border: none; padding: 3px 6px; border-radius: 3px; 
+                        cursor: pointer; font-size: 8px; font-weight: bold; flex: 1; min-width: 60px;
+                    ">👁️ 预览</button>
+                </div>
+            `;
+            
+            videoList.appendChild(entryDiv);
+            
+            // 自动滚动到底部
+            videoList.scrollTop = videoList.scrollHeight;
+        }
+        
+        // 新增：获取格式对应的颜色
+        getFormatColor(format) {
+            const colors = {
+                'hls': '#ff6b6b',
+                'dash': '#4ecdc4', 
+                'video': '#45b7d1',
+                'audio': '#96ceb4',
+                'blob': '#ffeaa7',
+                'live': '#fd79a8',
+                'unknown': '#6c5ce7'
+            };
+            return colors[format] || colors.unknown;
+        }
+        
+        // 新增：复制视频链接
+        copyVideoUrl(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                this.log('📋 链接已复制到剪贴板');
+                this.showToast('链接已复制！', 'success');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                this.log('❌ 复制失败，请手动复制');
+                this.showToast('复制失败', 'error');
+            });
+        }
+        
+        // 新增：在新标签页打开视频
+        openVideoInNewTab(url) {
+            try {
+                window.open(url, '_blank');
+                this.log('🔗 已在新标签页打开视频');
+                this.showToast('已在新标签页打开', 'success');
+            } catch (err) {
+                console.error('打开失败:', err);
+                this.log('❌ 无法打开新标签页');
+                this.showToast('打开失败', 'error');
+            }
+        }
+        
+        // 新增：下载视频
+        downloadVideo(url, format) {
+            try {
+                if (format === 'hls' || url.includes('.m3u8')) {
+                    // HLS流需要特殊处理
+                    this.downloadHLSStream(url);
+                } else if (format === 'blob' || url.startsWith('blob:')) {
+                    // Blob URL直接下载
+                    this.downloadBlob(url);
+                } else {
+                    // 普通视频文件
+                    this.downloadDirectVideo(url);
+                }
+            } catch (err) {
+                console.error('下载失败:', err);
+                this.log('❌ 下载失败: ' + err.message);
+                this.showToast('下载失败', 'error');
+            }
+        }
+        
+        // 新增：下载HLS流
+        downloadHLSStream(url) {
+            this.log('🔄 准备下载HLS流媒体...');
+            this.showToast('HLS下载功能开发中...', 'info');
+            
+            // TODO: 集成FFmpeg下载功能
+            const downloadInfo = `
+HLS流下载信息：
+URL: ${url}
+类型: M3U8播放列表
+建议: 使用FFmpeg或专用下载工具
+
+命令示例:
+ffmpeg -i "${url}" -c copy output.mp4
+            `;
+            
+            console.log(downloadInfo);
+            this.log('💡 请查看控制台获取FFmpeg下载命令');
+        }
+        
+        // 新增：下载Blob视频
+        downloadBlob(url) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `video_${Date.now()}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            this.log('💾 Blob视频下载已开始');
+            this.showToast('下载已开始', 'success');
+        }
+        
+        // 新增：下载直接视频文件
+        downloadDirectVideo(url) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = this.getFilenameFromUrl(url);
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            this.log('💾 视频下载已开始');
+            this.showToast('下载已开始', 'success');
+        }
+        
+        // 新增：从URL获取文件名
+        getFilenameFromUrl(url) {
+            try {
+                const urlObj = new URL(url);
+                const pathname = urlObj.pathname;
+                const filename = pathname.split('/').pop() || `video_${Date.now()}`;
+                return filename.includes('.') ? filename : `${filename}.mp4`;
+            } catch {
+                return `video_${Date.now()}.mp4`;
+            }
+        }
+        
+        // 新增：预览视频
+        previewVideo(url) {
+            this.createVideoPreview(url);
+        }
+        
+        // 新增：创建视频预览弹窗
+        createVideoPreview(url) {
+            // 移除现有预览窗口
+            const existingPreview = document.getElementById('streamwatch-preview');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+            
+            const preview = document.createElement('div');
+            preview.id = 'streamwatch-preview';
+            preview.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 10000;
+                background: rgba(0, 0, 0, 0.95);
+                padding: 20px;
+                border-radius: 8px;
+                border: 2px solid #00ff88;
+                max-width: 80vw;
+                max-height: 80vh;
+            `;
+            
+            preview.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #00ff88; margin: 0; font-size: 16px;">📺 视频预览</h3>
+                    <button onclick="this.parentElement.parentElement.remove()" style="
+                        background: #ff4444; color: #fff; border: none; padding: 5px 10px; 
+                        border-radius: 4px; cursor: pointer; font-weight: bold;
+                    ">✕ 关闭</button>
+                </div>
+                <video controls autoplay style="width: 100%; max-width: 600px; max-height: 400px;" 
+                       src="${url}" onerror="this.parentElement.querySelector('.error-msg').style.display='block'; this.style.display='none';">
+                    您的浏览器不支持视频播放
+                </video>
+                <div class="error-msg" style="display: none; color: #ff6b6b; text-align: center; padding: 20px;">
+                    ❌ 无法加载视频预览<br>
+                    <small>可能是跨域限制或格式不支持</small>
+                </div>
+                <div style="margin-top: 10px; color: #ccc; font-size: 12px; word-break: break-all;">
+                    <strong>链接:</strong> ${url}
+                </div>
+            `;
+            
+            document.body.appendChild(preview);
+            this.log('👁️ 视频预览已打开');
+        }
+        
+        // 新增：显示提示消息
+        showToast(message, type = 'info') {
+            const existingToast = document.getElementById('streamwatch-toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            const colors = {
+                'success': '#28a745',
+                'error': '#dc3545', 
+                'info': '#17a2b8',
+                'warning': '#ffc107'
+            };
+            
+            const toast = document.createElement('div');
+            toast.id = 'streamwatch-toast';
+            toast.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                z-index: 10001;
+                background: ${colors[type] || colors.info};
+                color: #fff;
+                padding: 10px 15px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 3000);
+        }
+        
+        // 新增：清空视频列表
+        clearVideoList() {
+            this.videoEntries.clear();
+            const videoList = document.getElementById('video-list');
+            if (videoList) {
+                videoList.innerHTML = '';
+            }
+            this.log('🗑️ 视频列表已清空');
+            this.showToast('视频列表已清空', 'success');
         }
         
         // 记录日志 - 增强UI展示
