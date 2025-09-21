@@ -691,14 +691,7 @@
         
         // 新增：复制视频链接
         copyVideoUrl(url) {
-            navigator.clipboard.writeText(url).then(() => {
-                this.log('📋 链接已复制到剪贴板');
-                this.showToast('链接已复制！', 'success');
-            }).catch(err => {
-                console.error('复制失败:', err);
-                this.log('❌ 复制失败，请手动复制');
-                this.showToast('复制失败', 'error');
-            });
+            this.copyToClipboard(url, '视频链接');
         }
         
         // 新增：在新标签页打开视频
@@ -737,21 +730,168 @@
         // 新增：下载HLS流
         downloadHLSStream(url) {
             this.log('🔄 准备下载HLS流媒体...');
-            this.showToast('HLS下载功能开发中...', 'info');
             
-            // TODO: 集成FFmpeg下载功能
-            const downloadInfo = `
-HLS流下载信息：
-URL: ${url}
-类型: M3U8播放列表
-建议: 使用FFmpeg或专用下载工具
-
-命令示例:
-ffmpeg -i "${url}" -c copy output.mp4
+            // 生成FFmpeg下载命令
+            const commands = this.generateFFmpegCommands(url);
+            
+            // 创建下载指导弹窗
+            this.createDownloadGuide(url, commands);
+            
+            this.log('💡 HLS下载指导已打开，请查看详细说明');
+        }
+        
+        // 新增：生成FFmpeg命令
+        generateFFmpegCommands(url) {
+            return {
+                basic: `ffmpeg -i "${url}" -c copy output.mp4`,
+                highQuality: `ffmpeg -i "${url}" -c:v libx264 -c:a aac -b:v 2M -b:a 128k output.mp4`,
+                convert: `ffmpeg -i "${url}" -c:v libx264 -preset fast -crf 23 -c:a aac output.mp4`,
+                audio: `ffmpeg -i "${url}" -vn -c:a aac output.aac`,
+                segments: `ffmpeg -i "${url}" -f segment -segment_time 600 -c copy output_%03d.mp4`
+            };
+        }
+        
+        // 新增：创建下载指导弹窗
+        createDownloadGuide(url, commands) {
+            // 移除现有指导窗口
+            const existing = document.getElementById('streamwatch-download-guide');
+            if (existing) {
+                existing.remove();
+            }
+            
+            const guide = document.createElement('div');
+            guide.id = 'streamwatch-download-guide';
+            guide.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 10001;
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
+                color: #00ff88;
+                padding: 25px;
+                border-radius: 12px;
+                border: 2px solid #00ff88;
+                max-width: 90vw;
+                max-height: 90vh;
+                overflow-y: auto;
+                font-family: 'Segoe UI', 'Microsoft YaHei', monospace;
+                box-shadow: 0 8px 24px rgba(0, 255, 136, 0.3);
+                backdrop-filter: blur(10px);
             `;
             
-            console.log(downloadInfo);
-            this.log('💡 请查看控制台获取FFmpeg下载命令');
+            guide.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid rgba(0, 255, 136, 0.3); padding-bottom: 15px;">
+                    <h3 style="color: #00ff88; margin: 0; font-size: 18px;">🎯 HLS流媒体下载指导</h3>
+                    <button onclick="this.parentElement.parentElement.remove()" style="
+                        background: #ff4444; color: #fff; border: none; padding: 8px 12px; 
+                        border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px;
+                    ">✕ 关闭</button>
+                </div>
+                
+                <div style="margin-bottom: 20px; padding: 15px; background: rgba(255, 99, 132, 0.1); border-radius: 8px; border-left: 4px solid #ff6384;">
+                    <h4 style="color: #ff6384; margin: 0 0 10px 0; font-size: 14px;">📋 流媒体信息</h4>
+                    <div style="color: #ccc; font-size: 12px; word-break: break-all; font-family: monospace;">
+                        <strong>URL:</strong> ${url}<br>
+                        <strong>类型:</strong> HLS (HTTP Live Streaming)<br>
+                        <strong>格式:</strong> M3U8 播放列表<br>
+                        <strong>说明:</strong> 需要使用FFmpeg或专业下载工具
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="color: #36a2eb; margin: 0 0 15px 0; font-size: 16px;">🛠️ FFmpeg下载命令</h4>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h5 style="color: #00ff88; margin: 0; font-size: 13px;">1. 基础下载 (推荐)</h5>
+                            <button onclick="streamWatch.copyToClipboard(\`${commands.basic}\`, '基础命令')" style="
+                                background: #17a2b8; color: #fff; border: none; padding: 4px 8px; 
+                                border-radius: 4px; cursor: pointer; font-size: 10px;
+                            ">📋 复制</button>
+                        </div>
+                        <div style="background: #1e1e1e; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 11px; color: #f8f8f2; overflow-x: auto;">
+                            ${commands.basic}
+                        </div>
+                        <div style="color: #888; font-size: 10px; margin-top: 5px;">
+                            直接复制流，保持原始质量，速度最快
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h5 style="color: #00ff88; margin: 0; font-size: 13px;">2. 高质量转码</h5>
+                            <button onclick="streamWatch.copyToClipboard(\`${commands.highQuality}\`, '高质量命令')" style="
+                                background: #17a2b8; color: #fff; border: none; padding: 4px 8px; 
+                                border-radius: 4px; cursor: pointer; font-size: 10px;
+                            ">📋 复制</button>
+                        </div>
+                        <div style="background: #1e1e1e; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 11px; color: #f8f8f2; overflow-x: auto;">
+                            ${commands.highQuality}
+                        </div>
+                        <div style="color: #888; font-size: 10px; margin-top: 5px;">
+                            重新编码为高质量MP4，文件稍大但兼容性好
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <h5 style="color: #00ff88; margin: 0; font-size: 13px;">3. 仅提取音频</h5>
+                            <button onclick="streamWatch.copyToClipboard(\`${commands.audio}\`, '音频命令')" style="
+                                background: #17a2b8; color: #fff; border: none; padding: 4px 8px; 
+                                border-radius: 4px; cursor: pointer; font-size: 10px;
+                            ">📋 复制</button>
+                        </div>
+                        <div style="background: #1e1e1e; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 11px; color: #f8f8f2; overflow-x: auto;">
+                            ${commands.audio}
+                        </div>
+                        <div style="color: #888; font-size: 10px; margin-top: 5px;">
+                            只下载音频流，节省空间
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px; padding: 15px; background: rgba(255, 206, 86, 0.1); border-radius: 8px; border-left: 4px solid #ffce56;">
+                    <h4 style="color: #ffce56; margin: 0 0 10px 0; font-size: 14px;">💡 使用说明</h4>
+                    <div style="color: #ccc; font-size: 12px; line-height: 1.5;">
+                        <strong>安装FFmpeg:</strong><br>
+                        • Windows: 下载官方包或使用 <code>choco install ffmpeg</code><br>
+                        • macOS: 使用 <code>brew install ffmpeg</code><br>
+                        • Ubuntu: 使用 <code>sudo apt install ffmpeg</code><br><br>
+                        
+                        <strong>使用步骤:</strong><br>
+                        1. 复制上方命令到命令行<br>
+                        2. 将 "output.mp4" 改为你想要的文件名<br>
+                        3. 在命令行中执行命令<br>
+                        4. 等待下载完成
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="streamWatch.openVideoInNewTab(\`${url}\`)" style="
+                        background: #28a745; color: #fff; border: none; padding: 10px 15px; 
+                        border-radius: 6px; cursor: pointer; font-weight: bold;
+                    ">🔗 在新窗口播放</button>
+                    <button onclick="streamWatch.copyToClipboard(\`${url}\`, 'HLS链接')" style="
+                        background: #6f42c1; color: #fff; border: none; padding: 10px 15px; 
+                        border-radius: 6px; cursor: pointer; font-weight: bold;
+                    ">📋 复制HLS链接</button>
+                </div>
+            `;
+            
+            document.body.appendChild(guide);
+        }
+        
+        // 新增：复制到剪贴板的通用方法
+        copyToClipboard(text, type) {
+            navigator.clipboard.writeText(text).then(() => {
+                this.log(`📋 ${type}已复制到剪贴板`);
+                this.showToast(`${type}已复制！`, 'success');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                this.log(`❌ ${type}复制失败`);
+                this.showToast('复制失败', 'error');
+            });
         }
         
         // 新增：下载Blob视频
