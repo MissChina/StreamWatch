@@ -1,18 +1,15 @@
 // ==UserScript==
-// @name         StreamWatch - 流媒体监控
-// @name:zh-CN   StreamWatch - 流媒体监控  
+// @name:zh-CN   StreamWatch - 流媒体监控
 // @description:zh-CN  监控和检测网页中的流媒体加载情况
 // @author       MissChina
 // @match        *://*/*
 // @grant        none
 // @namespace    https://github.com/MissChina/StreamWatch
-// @version      3.2.0
+// @version      3.2.1
 // @icon         https://github.com/MissChina/StreamWatch/raw/main/streamwatch.png
-// @license      Custom License - No Commercial Use, Attribution Required
+// @license      MIT
 // @homepageURL  https://github.com/MissChina/StreamWatch
 // @supportURL   https://github.com/MissChina/StreamWatch/issues
-// @updateURL    https://github.com/MissChina/StreamWatch/raw/main/streamwatch-userscript.js
-// @downloadURL  https://github.com/MissChina/StreamWatch/raw/main/streamwatch-userscript.js
 // ==/UserScript==
 
 (function(){
