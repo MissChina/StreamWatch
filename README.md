@@ -40,9 +40,9 @@ A powerful browser script for monitoring and detecting streaming media loading o
    - Firefox: [Tampermonkey Add-on](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/)
 
 2. **安装脚本**
-   ```
-   点击安装: streamwatch-userscript.js
-   ```
+
+   - [点击安装](https://github.com/MissChina/StreamWatch/raw/main/streamwatch-userscript.js)
+
 
 3. **使用方法**
    - 访问任何视频网站
