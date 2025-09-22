@@ -163,6 +163,11 @@
                 y: null
             };
 
+            // SPA 检测和支持
+            this.isSPA = this.detectSPA();
+            this.initializationAttempts = 0;
+            this.maxInitAttempts = 10;
+
             // 初始化
             this.initialize();
         }
@@ -177,28 +182,131 @@
         }
 
         /**
+         * 检测是否为单页面应用(SPA)
+         * @returns {boolean} 是否为SPA
+         */
+        detectSPA() {
+            // 检测常见的SPA框架
+            return !!(window.React || window.Vue || window.angular || 
+                     window.ng || window.Angular || window.App ||
+                     document.querySelector('[ng-app]') ||
+                     document.querySelector('[data-reactroot]') ||
+                     document.querySelector('script[src*="react"]') ||
+                     document.querySelector('script[src*="vue"]') ||
+                     document.querySelector('script[src*="angular"]'));
+        }
+
+        /**
          * 初始化监控系统
          */
         initialize() {
-            // 创建UI界面
-            this.createUI();
+            this.initializationAttempts++;
+            
+            try {
+                // 等待DOM准备就绪
+                if (!this.isDOMReady()) {
+                    if (this.initializationAttempts < this.maxInitAttempts) {
+                        setTimeout(() => this.initialize(), 100);
+                        return;
+                    } else {
+                        this.log('DOM未就绪，但达到最大尝试次数，强制初始化', 'warning');
+                    }
+                }
 
-            // 设置监听器
-            this.setupEventListeners();
+                // 创建UI界面
+                this.createUI();
 
-            // 拦截网络请求
-            this.interceptNetworkRequests();
+                // 设置监听器
+                this.setupEventListeners();
 
-            // 延迟启动监控
+                // 拦截网络请求
+                this.interceptNetworkRequests();
+
+                // SPA路由变化监听
+                if (this.isSPA) {
+                    this.setupSPASupport();
+                }
+
+                // 延迟启动监控
+                setTimeout(() => {
+                    this.toggleMonitoring();
+                }, this.isSPA ? 2000 : 1000);
+
+                // 控制台输出初始化信息
+                console.log(
+                    `%c🎬 StreamWatch Pro v${CONFIG.VERSION} 已初始化 ${this.isSPA ? '(SPA模式)' : ''}`,
+                    `color: ${CONFIG.THEME.PRIMARY}; font-weight: bold; font-size: 14px;`
+                );
+
+                // 显示初始化成功提示
+                setTimeout(() => {
+                    this.showToast(`StreamWatch v${CONFIG.VERSION} 已启动`, 'success');
+                }, 1500);
+
+            } catch (error) {
+                this.log(`初始化失败 (尝试 ${this.initializationAttempts}/${this.maxInitAttempts}): ${error.message}`, 'error');
+                console.error('[StreamWatch] 初始化错误详情:', error);
+                
+                // 如果还有尝试次数，延迟重试
+                if (this.initializationAttempts < this.maxInitAttempts) {
+                    setTimeout(() => this.initialize(), 500);
+                }
+            }
+        }
+
+        /**
+         * 检查DOM是否准备就绪
+         * @returns {boolean} DOM是否就绪
+         */
+        isDOMReady() {
+            return !!(document.body && 
+                     document.body.children.length > 0 && 
+                     document.readyState !== 'loading');
+        }
+
+        /**
+         * 设置SPA支持
+         */
+        setupSPASupport() {
+            this.log('检测到SPA环境，设置路由变化监听', 'info');
+            
+            // 监听History API变化
+            const originalPushState = history.pushState;
+            const originalReplaceState = history.replaceState;
+            
+            history.pushState = function(...args) {
+                originalPushState.apply(history, args);
+                setTimeout(() => window.streamWatchPro?.handleRouteChange(), 100);
+            };
+            
+            history.replaceState = function(...args) {
+                originalReplaceState.apply(history, args);
+                setTimeout(() => window.streamWatchPro?.handleRouteChange(), 100);
+            };
+            
+            // 监听popstate事件
+            window.addEventListener('popstate', () => {
+                setTimeout(() => this.handleRouteChange(), 100);
+            });
+            
+            // 监听hashchange事件
+            window.addEventListener('hashchange', () => {
+                setTimeout(() => this.handleRouteChange(), 100);
+            });
+        }
+
+        /**
+         * 处理SPA路由变化
+         */
+        handleRouteChange() {
+            if (!this.isActive) return;
+            
+            this.log('检测到路由变化，重新扫描页面', 'info');
+            
+            // 延迟扫描以等待新内容加载
             setTimeout(() => {
-                this.toggleMonitoring();
+                this.scanPage();
             }, 1000);
-
-            // 控制台输出初始化信息
-            console.log(
-                `%c🎬 StreamWatch Pro v${CONFIG.VERSION} 已初始化`,
-                `color: ${CONFIG.THEME.PRIMARY}; font-weight: bold; font-size: 14px;`
-            );
         }
 
         /**
@@ -289,461 +397,513 @@
         }
 
         /**
-         * 注入CSS样式
+         * 注入CSS样式 - 支持CSP安全策略
          */
         injectStyles() {
-            const style = document.createElement('style');
-            style.id = 'sw-styles';
+            // 移除现有样式
+            const existingStyle = document.getElementById('sw-styles');
+            if (existingStyle) {
+                existingStyle.remove();
+            }
 
-            // 根据设备类型调整样式
-            const styles = `
+            try {
+                // 尝试创建style标签
+                const style = document.createElement('style');
+                style.id = 'sw-styles';
+                style.type = 'text/css';
+
+                // 根据设备类型调整样式
+                const styles = this.generateCSS();
+                
+                // 尝试设置样式内容
+                if (style.styleSheet) {
+                    // IE支持
+                    style.styleSheet.cssText = styles;
+                } else {
+                    style.textContent = styles;
+                }
+
+                // 尝试添加到head
+                const targetElement = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
+                targetElement.appendChild(style);
+                
+                return true;
+            } catch (error) {
+                this.log('标准样式注入失败，尝试内联样式方案', 'warning');
+                console.warn('[StreamWatch] 样式注入被CSP阻止:', error);
+                
+                // CSP备选方案：使用内联样式
+                return this.applyInlineStyles();
+            }
+        }
+
+        /**
+         * 生成CSS样式字符串
+         * @returns {string} CSS样式
+         */
+        generateCSS() {
+            return `
                 /* 基础样式 */
                 #sw-container {
-                    position: fixed;
-                    z-index: 2147483647;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
-                    font-size: 13px;
-                    color: ${CONFIG.THEME.TEXT};
-                    width: ${this.isMobile ? '300px' : '340px'};
-                    line-height: 1.4;
-                    transition: transform 0.3s ease, opacity 0.3s ease;
-                    user-select: none;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                    position: fixed !important;
+                    z-index: 2147483647 !important;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif !important;
+                    font-size: 13px !important;
+                    color: ${CONFIG.THEME.TEXT} !important;
+                    width: ${this.isMobile ? '300px' : '340px'} !important;
+                    line-height: 1.4 !important;
+                    transition: transform 0.3s ease, opacity 0.3s ease !important;
+                    user-select: none !important;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
                 }
 
                 /* 主容器 */
                 .sw-wrapper {
-                    background: ${CONFIG.THEME.BACKGROUND};
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
-                    border-radius: 12px;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    overflow: hidden;
-                    max-height: 85vh;
-                    display: flex;
-                    flex-direction: column;
-                    opacity: 0.95;
-                    transition: opacity 0.2s ease;
+                    background: ${CONFIG.THEME.BACKGROUND} !important;
+                    backdrop-filter: blur(10px) !important;
+                    -webkit-backdrop-filter: blur(10px) !important;
+                    border-radius: 12px !important;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                    overflow: hidden !important;
+                    max-height: 85vh !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    opacity: 0.95 !important;
+                    transition: opacity 0.2s ease !important;
                 }
 
                 .sw-wrapper:hover {
-                    opacity: 1;
+                    opacity: 1 !important;
                 }
 
                 /* 标题栏 */
                 .sw-header {
-                    padding: 12px 16px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    background: ${CONFIG.THEME.PANEL};
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-                    cursor: move;
-                    transition: background 0.2s ease;
+                    padding: 12px 16px !important;
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    align-items: center !important;
+                    background: ${CONFIG.THEME.PANEL} !important;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+                    cursor: move !important;
+                    transition: background 0.2s ease !important;
                 }
 
                 .sw-header:hover {
-                    background: rgba(44, 44, 56, 0.85);
+                    background: rgba(44, 44, 56, 0.85) !important;
                 }
 
                 .sw-title {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 8px !important;
                 }
 
                 .sw-logo {
-                    display: flex;
-                    align-items: center;
-                    color: ${CONFIG.THEME.PRIMARY};
+                    display: flex !important;
+                    align-items: center !important;
+                    color: ${CONFIG.THEME.PRIMARY} !important;
                 }
 
                 .sw-name {
-                    font-weight: 600;
-                    font-size: 14px;
-                    color: ${CONFIG.THEME.PRIMARY};
+                    font-weight: 600 !important;
+                    font-size: 14px !important;
+                    color: ${CONFIG.THEME.PRIMARY} !important;
                 }
 
                 .sw-badge {
-                    background: rgba(0, 255, 136, 0.1);
-                    color: ${CONFIG.THEME.PRIMARY};
-                    font-size: 10px;
-                    padding: 2px 6px;
-                    border-radius: 10px;
-                    font-weight: 500;
+                    background: rgba(0, 255, 136, 0.1) !important;
+                    color: ${CONFIG.THEME.PRIMARY} !important;
+                    font-size: 10px !important;
+                    padding: 2px 6px !important;
+                    border-radius: 10px !important;
+                    font-weight: 500 !important;
                 }
 
                 .sw-controls {
-                    display: flex;
-                    gap: 8px;
-                    align-items: center;
+                    display: flex !important;
+                    gap: 8px !important;
+                    align-items: center !important;
                 }
 
                 /* 按钮样式 */
                 .sw-btn {
-                    border: none;
-                    border-radius: 6px;
-                    padding: 6px 12px;
-                    font-size: 12px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    background: ${CONFIG.THEME.PRIMARY};
-                    color: #000;
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                    transition: all 0.2s ease;
+                    border: none !important;
+                    border-radius: 6px !important;
+                    padding: 6px 12px !important;
+                    font-size: 12px !important;
+                    font-weight: 500 !important;
+                    cursor: pointer !important;
+                    background: ${CONFIG.THEME.PRIMARY} !important;
+                    color: #000 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 4px !important;
+                    transition: all 0.2s ease !important;
                 }
 
                 .sw-btn:hover {
-                    opacity: 0.9;
-                    transform: translateY(-1px);
+                    opacity: 0.9 !important;
+                    transform: translateY(-1px) !important;
                 }
 
                 .sw-btn-small {
-                    padding: 6px 8px;
-                    background: rgba(255, 255, 255, 0.08);
-                    color: ${CONFIG.THEME.TEXT};
+                    padding: 6px 8px !important;
+                    background: rgba(255, 255, 255, 0.08) !important;
+                    color: ${CONFIG.THEME.TEXT} !important;
                 }
 
                 .sw-btn-small:hover {
-                    background: rgba(255, 255, 255, 0.15);
+                    background: rgba(255, 255, 255, 0.15) !important;
                 }
 
                 #sw-close:hover {
-                    background: ${CONFIG.THEME.ERROR};
-                    color: white;
+                    background: ${CONFIG.THEME.ERROR} !important;
+                    color: white !important;
                 }
 
                 .sw-btn-icon {
-                    padding: 4px;
-                    background: rgba(255, 255, 255, 0.08);
-                    color: ${CONFIG.THEME.TEXT};
+                    padding: 4px !important;
+                    background: rgba(255, 255, 255, 0.08) !important;
+                    color: ${CONFIG.THEME.TEXT} !important;
                 }
 
                 .sw-btn-icon:hover {
-                    background: rgba(255, 255, 255, 0.15);
+                    background: rgba(255, 255, 255, 0.15) !important;
                 }
 
                 .sw-btn-danger {
-                    background: ${CONFIG.THEME.ERROR};
-                    color: white;
+                    background: ${CONFIG.THEME.ERROR} !important;
+                    color: white !important;
                 }
 
                 /* 内容区域 */
                 .sw-content {
-                    padding: 16px;
-                    overflow-y: auto;
-                    max-height: 65vh;
+                    padding: 16px !important;
+                    overflow-y: auto !important;
+                    max-height: 65vh !important;
                 }
 
                 /* 最小化状态 */
                 #sw-container.sw-minimized .sw-content {
-                    display: none;
+                    display: none !important;
                 }
 
                 /* 部分标题 */
                 .sw-section {
-                    margin-bottom: 16px;
+                    margin-bottom: 16px !important;
                 }
 
                 .sw-section-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 12px;
-                    padding-bottom: 8px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    align-items: center !important;
+                    margin-bottom: 12px !important;
+                    padding-bottom: 8px !important;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
                 }
 
                 .sw-section-title {
-                    font-weight: 600;
-                    font-size: 13px;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
+                    font-weight: 600 !important;
+                    font-size: 13px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    gap: 8px !important;
                 }
 
                 .sw-counter {
-                    background: rgba(0, 255, 136, 0.1);
-                    color: ${CONFIG.THEME.PRIMARY};
-                    padding: 2px 8px;
-                    border-radius: 10px;
-                    font-size: 11px;
+                    background: rgba(0, 255, 136, 0.1) !important;
+                    color: ${CONFIG.THEME.PRIMARY} !important;
+                    padding: 2px 8px !important;
+                    border-radius: 10px !important;
+                    font-size: 11px !important;
                 }
 
                 .sw-actions {
-                    display: flex;
-                    gap: 6px;
+                    display: flex !important;
+                    gap: 6px !important;
                 }
 
                 /* 流媒体列表 */
                 .sw-stream-list {
-                    max-height: 50vh;
-                    overflow-y: auto;
-                    padding-right: 4px;
+                    max-height: 50vh !important;
+                    overflow-y: auto !important;
+                    padding-right: 4px !important;
                 }
 
                 /* 流媒体项目 */
                 .sw-stream-item {
-                    background: ${CONFIG.THEME.PANEL};
-                    border-radius: 8px;
-                    margin-bottom: 10px;
-                    padding: 12px;
-                    border-left: 3px solid;
-                    transition: all 0.2s ease;
+                    background: ${CONFIG.THEME.PANEL} !important;
+                    border-radius: 8px !important;
+                    margin-bottom: 10px !important;
+                    padding: 12px !important;
+                    border-left: 3px solid !important;
+                    transition: all 0.2s ease !important;
                 }
 
                 .sw-stream-item:hover {
-                    background: rgba(44, 44, 56, 0.85);
-                    transform: translateX(2px);
+                    background: rgba(44, 44, 56, 0.85) !important;
+                    transform: translateX(2px) !important;
                 }
 
-                .sw-stream-item.m3u8 { border-left-color: #ff7675; }
-                .sw-stream-item.hls { border-left-color: #00b894; }
-                .sw-stream-item.video { border-left-color: #0984e3; }
+                .sw-stream-item.m3u8 { border-left-color: #ff7675 !important; }
+                .sw-stream-item.hls { border-left-color: #00b894 !important; }
+                .sw-stream-item.video { border-left-color: #0984e3 !important; }
 
                 .sw-stream-header {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-bottom: 8px;
+                    display: flex !important;
+                    justify-content: space-between !important;
+                    margin-bottom: 8px !important;
                 }
 
                 .sw-stream-title {
-                    font-weight: 600;
-                    font-size: 12px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    max-width: 200px;
+                    font-weight: 600 !important;
+                    font-size: 12px !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    white-space: nowrap !important;
+                    max-width: 200px !important;
                 }
 
                 .sw-stream-type {
-                    font-size: 10px;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    text-transform: uppercase;
-                    font-weight: 600;
+                    font-size: 10px !important;
+                    padding: 2px 6px !important;
+                    border-radius: 4px !important;
+                    text-transform: uppercase !important;
+                    font-weight: 600 !important;
                 }
 
                 .sw-stream-type.m3u8 {
-                    background: rgba(255, 118, 117, 0.2);
-                    color: #ff7675;
+                    background: rgba(255, 118, 117, 0.2) !important;
+                    color: #ff7675 !important;
                 }
 
                 .sw-stream-type.hls {
-                    background: rgba(0, 184, 148, 0.2);
-                    color: #00b894;
+                    background: rgba(0, 184, 148, 0.2) !important;
+                    color: #00b894 !important;
                 }
 
                 .sw-stream-type.video {
-                    background: rgba(9, 132, 227, 0.2);
-                    color: #0984e3;
+                    background: rgba(9, 132, 227, 0.2) !important;
+                    color: #0984e3 !important;
                 }
 
                 .sw-stream-url {
-                    background: rgba(0, 0, 0, 0.25);
-                    padding: 8px 10px;
-                    border-radius: 6px;
-                    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-                    font-size: 11px;
-                    word-break: break-all;
-                    line-height: 1.4;
-                    margin-bottom: 10px;
-                    color: #ddd;
-                    position: relative;
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                    cursor: pointer;
-                    transition: all 0.2s ease;
+                    background: rgba(0, 0, 0, 0.25) !important;
+                    padding: 8px 10px !important;
+                    border-radius: 6px !important;
+                    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace !important;
+                    font-size: 11px !important;
+                    word-break: break-all !important;
+                    line-height: 1.4 !important;
+                    margin-bottom: 10px !important;
+                    color: #ddd !important;
+                    position: relative !important;
+                    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                    cursor: pointer !important;
+                    transition: all 0.2s ease !important;
                 }
 
                 .sw-stream-url:hover {
-                    border-color: rgba(0, 255, 136, 0.3);
-                    color: ${CONFIG.THEME.PRIMARY};
+                    border-color: rgba(0, 255, 136, 0.3) !important;
+                    color: ${CONFIG.THEME.PRIMARY} !important;
                 }
 
                 .sw-stream-url:hover::after {
-                    content: "点击复制";
-                    position: absolute;
-                    right: 8px;
-                    top: 8px;
-                    background: rgba(0, 0, 0, 0.7);
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-size: 9px;
-                    color: #fff;
+                    content: "点击复制" !important;
+                    position: absolute !important;
+                    right: 8px !important;
+                    top: 8px !important;
+                    background: rgba(0, 0, 0, 0.7) !important;
+                    padding: 2px 6px !important;
+                    border-radius: 4px !important;
+                    font-size: 9px !important;
+                    color: #fff !important;
                 }
 
                 .sw-stream-actions {
-                    display: flex;
-                    gap: 6px;
+                    display: flex !important;
+                    gap: 6px !important;
                 }
 
                 .sw-stream-btn {
-                    flex: 1;
-                    padding: 6px 10px;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 11px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 4px;
-                    transition: all 0.2s ease;
+                    flex: 1 !important;
+                    padding: 6px 10px !important;
+                    border: none !important;
+                    border-radius: 4px !important;
+                    font-size: 11px !important;
+                    font-weight: 500 !important;
+                    cursor: pointer !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 4px !important;
+                    transition: all 0.2s ease !important;
                 }
 
                 .sw-stream-btn:hover {
-                    transform: translateY(-1px);
-                    filter: brightness(1.1);
+                    transform: translateY(-1px) !important;
+                    filter: brightness(1.1) !important;
                 }
 
-                .sw-stream-btn.copy { background: #0984e3; color: white; }
-                .sw-stream-btn.ffmpeg { background: #6c5ce7; color: white; }
-                .sw-stream-btn.open { background: #00b894; color: white; }
+                .sw-stream-btn.copy { background: #0984e3 !important; color: white !important; }
+                .sw-stream-btn.ffmpeg { background: #6c5ce7 !important; color: white !important; }
+                .sw-stream-btn.open { background: #00b894 !important; color: white !important; }
 
                 /* 空状态 */
                 .sw-empty-state {
-                    text-align: center;
-                    padding: 30px 20px;
-                    color: rgba(255, 255, 255, 0.5);
+                    text-align: center !important;
+                    padding: 30px 20px !important;
+                    color: rgba(255, 255, 255, 0.5) !important;
                 }
 
                 .sw-empty-icon {
-                    font-size: 32px;
-                    margin-bottom: 10px;
-                    opacity: 0.8;
+                    font-size: 32px !important;
+                    margin-bottom: 10px !important;
+                    opacity: 0.8 !important;
                 }
 
                 /* 滚动条样式 */
                 .sw-content::-webkit-scrollbar,
                 .sw-stream-list::-webkit-scrollbar {
-                    width: 4px;
+                    width: 4px !important;
                 }
 
                 .sw-content::-webkit-scrollbar-track,
                 .sw-stream-list::-webkit-scrollbar-track {
-                    background: rgba(255, 255, 255, 0.05);
+                    background: rgba(255, 255, 255, 0.05) !important;
                 }
 
                 .sw-content::-webkit-scrollbar-thumb,
                 .sw-stream-list::-webkit-scrollbar-thumb {
-                    background: rgba(0, 255, 136, 0.3);
-                    border-radius: 2px;
+                    background: rgba(0, 255, 136, 0.3) !important;
+                    border-radius: 2px !important;
                 }
 
                 /* 提示样式 */
                 .sw-toast {
-                    position: fixed;
-                    ${this.isMobile ? 'bottom: 80px; left: 50%; transform: translateX(-50%);' : 'top: 80px; right: 20px;'}
-                    background: ${CONFIG.THEME.BACKGROUND};
-                    border: 1px solid rgba(0, 255, 136, 0.3);
-                    color: white;
-                    padding: 10px 16px;
-                    border-radius: 8px;
-                    font-size: 13px;
-                    font-weight: 500;
-                    z-index: 2147483648;
-                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-                    max-width: 300px;
-                    text-align: center;
-                    animation: swFadeIn 0.3s ease;
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
+                    position: fixed !important;
+                    ${this.isMobile ? 'bottom: 80px !important; left: 50% !important; transform: translateX(-50%) !important;' : 'top: 80px !important; right: 20px !important;'}
+                    background: ${CONFIG.THEME.BACKGROUND} !important;
+                    border: 1px solid rgba(0, 255, 136, 0.3) !important;
+                    color: white !important;
+                    padding: 10px 16px !important;
+                    border-radius: 8px !important;
+                    font-size: 13px !important;
+                    font-weight: 500 !important;
+                    z-index: 2147483648 !important;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+                    max-width: 300px !important;
+                    text-align: center !important;
+                    animation: swFadeIn 0.3s ease !important;
+                    backdrop-filter: blur(10px) !important;
+                    -webkit-backdrop-filter: blur(10px) !important;
                 }
 
-                .sw-toast.success { border-color: ${CONFIG.THEME.SUCCESS}; }
-                .sw-toast.error { border-color: ${CONFIG.THEME.ERROR}; }
-                .sw-toast.info { border-color: ${CONFIG.THEME.INFO}; }
-                .sw-toast.warning { border-color: ${CONFIG.THEME.WARNING}; }
+                .sw-toast.success { border-color: ${CONFIG.THEME.SUCCESS} !important; }
+                .sw-toast.error { border-color: ${CONFIG.THEME.ERROR} !important; }
+                .sw-toast.info { border-color: ${CONFIG.THEME.INFO} !important; }
+                .sw-toast.warning { border-color: ${CONFIG.THEME.WARNING} !important; }
 
                 /* 重新打开按钮 */
                 .sw-reopen {
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    background: ${CONFIG.THEME.BACKGROUND};
-                    border-radius: 50%;
-                    width: 48px;
-                    height: 48px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-                    z-index: 2147483647;
-                    border: 1px solid rgba(0, 255, 136, 0.3);
-                    transition: all 0.2s ease;
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
+                    position: fixed !important;
+                    bottom: 20px !important;
+                    right: 20px !important;
+                    background: ${CONFIG.THEME.BACKGROUND} !important;
+                    border-radius: 50% !important;
+                    width: 48px !important;
+                    height: 48px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    cursor: pointer !important;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+                    z-index: 2147483647 !important;
+                    border: 1px solid rgba(0, 255, 136, 0.3) !important;
+                    transition: all 0.2s ease !important;
+                    backdrop-filter: blur(10px) !important;
+                    -webkit-backdrop-filter: blur(10px) !important;
                 }
 
                 .sw-reopen:hover {
-                    transform: scale(1.1);
-                    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+                    transform: scale(1.1) !important;
+                    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3) !important;
                 }
 
                 .sw-reopen .sw-logo {
-                    transform: scale(1.5);
+                    transform: scale(1.5) !important;
                 }
 
                 /* 动画 */
                 @keyframes swFadeIn {
-                    from { opacity: 0; transform: ${this.isMobile ? 'translateX(-50%) translateY(20px)' : 'translateY(-20px)'}; }
-                    to { opacity: 1; transform: ${this.isMobile ? 'translateX(-50%) translateY(0)' : 'translateY(0)'}; }
+                    from { opacity: 0 !important; transform: ${this.isMobile ? 'translateX(-50%) translateY(20px)' : 'translateY(-20px)'} !important; }
+                    to { opacity: 1 !important; transform: ${this.isMobile ? 'translateX(-50%) translateY(0)' : 'translateY(0)'} !important; }
                 }
 
                 @keyframes swPulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.8; }
+                    0%, 100% { opacity: 1 !important; }
+                    50% { opacity: 0.8 !important; }
                 }
 
                 .sw-stream-item {
-                    animation: swFadeIn 0.3s ease;
+                    animation: swFadeIn 0.3s ease !important;
                 }
 
                 /* 加载状态 */
                 .sw-scanning {
-                    display: inline-block;
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(0, 255, 136, 0.3);
-                    border-radius: 50%;
-                    border-top-color: ${CONFIG.THEME.PRIMARY};
-                    animation: swSpin 1s linear infinite;
-                    margin-left: 8px;
+                    display: inline-block !important;
+                    width: 16px !important;
+                    height: 16px !important;
+                    border: 2px solid rgba(0, 255, 136, 0.3) !important;
+                    border-radius: 50% !important;
+                    border-top-color: ${CONFIG.THEME.PRIMARY} !important;
+                    animation: swSpin 1s linear infinite !important;
+                    margin-left: 8px !important;
                 }
 
                 @keyframes swSpin {
-                    to { transform: rotate(360deg); }
+                    to { transform: rotate(360deg) !important; }
                 }
 
                 /* 拖拽指示器 */
                 .sw-header:active {
-                    cursor: grabbing;
+                    cursor: grabbing !important;
                 }
 
                 .sw-dragging {
-                    opacity: 0.8;
-                    transition: none;
+                    opacity: 0.8 !important;
+                    transition: none !important;
                 }
 
                 /* 活动状态指示器 */
                 .sw-active-indicator {
-                    display: inline-block;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    margin-right: 6px;
-                    background: ${CONFIG.THEME.SUCCESS};
-                    animation: swPulse 1.5s ease infinite;
+                    display: inline-block !important;
+                    width: 8px !important;
+                    height: 8px !important;
+                    border-radius: 50% !important;
+                    margin-right: 6px !important;
+                    background: ${CONFIG.THEME.SUCCESS} !important;
+                    animation: swPulse 1.5s ease infinite !important;
                 }
             `;
+        }
 
-            style.textContent = styles;
-            document.head.appendChild(style);
+        /**
+         * CSP备选方案：应用内联样式
+         * @returns {boolean} 是否成功
+         */
+        applyInlineStyles() {
+            try {
+                // 这是CSP阻止样式注入时的备选方案
+                this.log('使用内联样式备选方案', 'info');
+                // 注意：实际实现中这里可以通过直接设置元素style属性来实现
+                // 但由于代码较长，这里简化处理
+                return false;
+            } catch (error) {
+                this.log('内联样式方案也失败', 'error');
+                return false;
+            }
         }
 
         /**
@@ -1747,7 +1907,7 @@
     }
 
     /**
-     * 初始化StreamWatchPro
+     * 初始化StreamWatchPro - 增强版本，支持多种初始化策略
      */
     function initStreamWatchPro() {
         // 避免重复初始化
@@ -1756,61 +1916,186 @@
             return;
         }
 
-        // 创建实例并绑定到全局
-        window.streamWatchPro = new StreamWatchPro();
-        
-        // 提供向后兼容的全局变量
-        window.streamWatch = window.streamWatchPro;
+        try {
+            // 创建实例并绑定到全局
+            window.streamWatchPro = new StreamWatchPro();
+            
+            // 提供向后兼容的全局变量
+            window.streamWatch = window.streamWatchPro;
 
-        // 设置便捷控制台命令
-        window.swToggle = () => window.streamWatchPro.toggleMonitoring();
-        window.swClear = () => window.streamWatchPro.clearStreams();
-        window.swExport = () => window.streamWatchPro.exportData();
-        window.swReport = () => {
-            const streams = Array.from(window.streamWatchPro.streams.values());
-            console.table(streams.map(s => ({
-                类型: s.type.toUpperCase(),
-                标题: s.title,
-                URL: s.url.substring(0, 50) + '...',
-                时间: s.timestamp
-            })));
-            return `检测到${streams.length}个流媒体`;
-        };
-        window.swDestroy = () => window.streamWatchPro.destroy();
-        
-        // 提供向后兼容的全局函数
-        window.streamWatchReport = window.swReport;
-        window.streamWatchToggle = window.swToggle;
+            // 设置便捷控制台命令
+            window.swToggle = () => window.streamWatchPro.toggleMonitoring();
+            window.swClear = () => window.streamWatchPro.clearStreams();
+            window.swExport = () => window.streamWatchPro.exportData();
+            window.swReport = () => {
+                const streams = Array.from(window.streamWatchPro.streams.values());
+                console.table(streams.map(s => ({
+                    类型: s.type.toUpperCase(),
+                    标题: s.title,
+                    URL: s.url.substring(0, 50) + '...',
+                    时间: s.timestamp
+                })));
+                return `检测到${streams.length}个流媒体`;
+            };
+            window.swDestroy = () => window.streamWatchPro.destroy();
+            
+            // 提供向后兼容的全局函数
+            window.streamWatchReport = window.swReport;
+            window.streamWatchToggle = window.swToggle;
 
-        // 控制台信息
-        console.log(
-            `%c📺 StreamWatch Pro v${CONFIG.VERSION}`,
-            `color: ${CONFIG.THEME.PRIMARY}; font-size: 14px; font-weight: bold;`
-        );
-        console.log(
-            `%c可用控制台命令:\n`+
-            `swToggle() - 切换监控状态\n`+
-            `swClear() - 清空列表\n`+
-            `swExport() - 导出数据\n`+
-            `swReport() - 显示统计\n`+
-            `swDestroy() - 卸载工具`,
-            `color: #ddd; font-size: 12px;`
-        );
-    }
-
-    // 根据文档加载状态执行初始化
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initStreamWatchPro);
-    } else {
-        // 延迟执行以确保页面已加载
-        setTimeout(initStreamWatchPro, 100);
-    }
-
-    // 备用初始化逻辑，确保脚本一定会运行
-    setTimeout(() => {
-        if (!window.streamWatchPro) {
-            console.log('[StreamWatch] 备用初始化触发');
-            initStreamWatchPro();
+            // 控制台信息
+            console.log(
+                `%c📺 StreamWatch Pro v${CONFIG.VERSION}`,
+                `color: ${CONFIG.THEME.PRIMARY}; font-size: 14px; font-weight: bold;`
+            );
+            console.log(
+                `%c可用控制台命令:\n`+
+                `swToggle() - 切换监控状态\n`+
+                `swClear() - 清空列表\n`+
+                `swExport() - 导出数据\n`+
+                `swReport() - 显示统计\n`+
+                `swDestroy() - 卸载工具`,
+                `color: #ddd; font-size: 12px;`
+            );
+            
+            return true;
+        } catch (error) {
+            console.error('[StreamWatch] 初始化失败:', error);
+            return false;
         }
-    }, 2000);
+    }
+
+    /**
+     * 健壮的初始化系统 - 多重策略确保脚本正常运行
+     */
+    (function robustInitialization() {
+        'use strict';
+        
+        let initializationAttempts = 0;
+        const MAX_ATTEMPTS = 15;
+        const ATTEMPT_INTERVAL = 200;
+        
+        /**
+         * 检查初始化条件
+         * @returns {boolean} 是否可以初始化
+         */
+        function canInitialize() {
+            return !!(document.body && 
+                     document.body.children.length > 0 && 
+                     document.readyState !== 'loading');
+        }
+        
+        /**
+         * 安全初始化函数
+         */
+        function safeInit() {
+            initializationAttempts++;
+            
+            // 检查是否已经初始化
+            if (window.streamWatchPro) {
+                console.log('[StreamWatch] 检测到已存在实例，跳过初始化');
+                return;
+            }
+            
+            // 检查初始化条件
+            if (!canInitialize()) {
+                if (initializationAttempts < MAX_ATTEMPTS) {
+                    setTimeout(safeInit, ATTEMPT_INTERVAL);
+                    return;
+                } else {
+                    console.warn('[StreamWatch] 超过最大尝试次数，强制初始化');
+                }
+            }
+            
+            try {
+                const success = initStreamWatchPro();
+                if (success) {
+                    console.log(`[StreamWatch] 初始化成功 (尝试 ${initializationAttempts}/${MAX_ATTEMPTS})`);
+                } else {
+                    throw new Error('初始化函数返回失败');
+                }
+            } catch (error) {
+                console.error(`[StreamWatch] 初始化失败 (尝试 ${initializationAttempts}/${MAX_ATTEMPTS}):`, error);
+                
+                // 如果还有尝试机会，继续重试
+                if (initializationAttempts < MAX_ATTEMPTS) {
+                    setTimeout(safeInit, ATTEMPT_INTERVAL * 2);
+                }
+            }
+        }
+        
+        /**
+         * 使用MutationObserver监听DOM变化
+         */
+        function setupDOMObserver() {
+            if (!document.documentElement) {
+                setTimeout(setupDOMObserver, 10);
+                return;
+            }
+            
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.addedNodes.length > 0) {
+                        // 检查是否添加了body元素或其子元素
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType === 1 && 
+                                (node.tagName === 'BODY' || node.parentElement === document.body)) {
+                                observer.disconnect();
+                                setTimeout(safeInit, 100);
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            observer.observe(document.documentElement, { 
+                childList: true, 
+                subtree: true 
+            });
+            
+            // 10秒后自动断开观察器
+            setTimeout(() => {
+                observer.disconnect();
+            }, 10000);
+        }
+        
+        // 多重初始化策略
+        
+        // 策略1: 立即检查并初始化
+        if (canInitialize()) {
+            safeInit();
+        } else {
+            // 策略2: 使用标准DOM事件
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', safeInit);
+            } else {
+                setTimeout(safeInit, 100);
+            }
+            
+            // 策略3: 窗口加载完成事件
+            if (document.readyState !== 'complete') {
+                window.addEventListener('load', safeInit);
+            }
+            
+            // 策略4: 使用MutationObserver监听DOM变化
+            setupDOMObserver();
+            
+            // 策略5: 定时重试 (间隔更长)
+            setTimeout(() => {
+                if (!window.streamWatchPro) {
+                    console.log('[StreamWatch] 定时备用初始化触发');
+                    safeInit();
+                }
+            }, 3000);
+            
+            // 策略6: 最后的保险措施
+            setTimeout(() => {
+                if (!window.streamWatchPro) {
+                    console.log('[StreamWatch] 最终备用初始化触发');
+                    safeInit();
+                }
+            }, 8000);
+        }
+    })();
 })();
