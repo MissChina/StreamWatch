@@ -2,7 +2,7 @@
 // @name         StreamWatch - 流媒体监控
 // @name:zh-CN   StreamWatch - 流媒体监控  
 // @namespace    https://github.com/MissChina/StreamWatch
-// @version      1.0.0-2025
+// @version      2.7.0
 // @description  Monitor and detect streaming media loading on web pages
 // @description:zh-CN  监控和检测网页中的流媒体加载情况
 // @author       MissChina
@@ -21,20 +21,20 @@
 
     /**
      * StreamWatch Pro - 高级M3U8/HLS流媒体检测器
-     * 版本: 2.6.0
+     * 版本: 2.7.0
      * 作者: MissChina
      *
-     * 优化项目:
-     * 1. 全新半透明UI设计，减少视觉干扰
-     * 2. 精确的流媒体检测算法，优化过滤规则
-     * 3. 改进的拖拽体验
-     * 4. 添加关闭按钮
-     * 5. 更严格的筛选条件，避免误检测
+     * 版本 2.7.0 更新内容:
+     * 1. 修复版本号不一致问题
+     * 2. 优化全局变量命名规范
+     * 3. 改进代码逻辑和错误处理
+     * 4. 统一API接口命名
+     * 5. 优化UI交互体验
      */
 
     // 配置常量 - Configuration constants
     const CONFIG = {
-        VERSION: '2.6.0',
+        VERSION: '2.7.0',
         AUTHOR: 'MissChina',
         GITHUB: 'https://github.com/MissChina/StreamWatch',
         THEME: {
@@ -1649,6 +1649,56 @@
         }
 
         /**
+         * 获取监控报告
+         * @returns {Object} - 详细的监控报告
+         */
+        getReport() {
+            const streams = Array.from(this.streams.values());
+            const report = {
+                version: CONFIG.VERSION,
+                timestamp: new Date().toISOString(),
+                pageUrl: window.location.href,
+                pageTitle: document.title,
+                isActive: this.isActive,
+                statistics: {
+                    totalStreams: streams.length,
+                    streamTypes: {},
+                    detectedFormats: new Set()
+                },
+                streams: streams.map(stream => ({
+                    url: stream.url,
+                    type: stream.type,
+                    title: stream.title,
+                    timestamp: stream.timestamp
+                }))
+            };
+
+            // 统计流媒体类型
+            streams.forEach(stream => {
+                report.statistics.streamTypes[stream.type] = (report.statistics.streamTypes[stream.type] || 0) + 1;
+                report.statistics.detectedFormats.add(stream.type);
+            });
+
+            report.statistics.detectedFormats = Array.from(report.statistics.detectedFormats);
+            
+            return report;
+        }
+
+        /**
+         * 简化的切换方法（向后兼容）
+         */
+        toggle() {
+            return this.toggleMonitoring();
+        }
+
+        /**
+         * 简化的分析方法（向后兼容）
+         */
+        analyze(url) {
+            return this.analyzeUrl(url);
+        }
+
+        /**
          * 记录日志
          * @param {string} message - 日志消息
          * @param {string} type - 日志类型
@@ -1690,6 +1740,7 @@
 
             // 移除实例引用
             window.streamWatchPro = null;
+            window.streamWatch = null;
 
             this.log('StreamWatch已完全卸载', 'warning');
         }
@@ -1707,6 +1758,9 @@
 
         // 创建实例并绑定到全局
         window.streamWatchPro = new StreamWatchPro();
+        
+        // 提供向后兼容的全局变量
+        window.streamWatch = window.streamWatchPro;
 
         // 设置便捷控制台命令
         window.swToggle = () => window.streamWatchPro.toggleMonitoring();
@@ -1723,6 +1777,10 @@
             return `检测到${streams.length}个流媒体`;
         };
         window.swDestroy = () => window.streamWatchPro.destroy();
+        
+        // 提供向后兼容的全局函数
+        window.streamWatchReport = window.swReport;
+        window.streamWatchToggle = window.swToggle;
 
         // 控制台信息
         console.log(
